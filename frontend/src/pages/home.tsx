@@ -1,4 +1,5 @@
-import './home.css';
+import { Link } from "react-router-dom";
+import "./home.css";
 
 export default function Home() {
   return (
@@ -50,7 +51,9 @@ export default function Home() {
         <div className="steps">
           <div className="step-box">
             <div className="badge-num">1</div>
-            <div className="step-title">Bot–Bot Negotiation (Text vs. Text)</div>
+            <div className="step-title">
+              <Link to="/text-to-text">Bot–Bot Negotiation (Text vs. Text)</Link>
+            </div>
             <p className="muted">
               Two LLM agents with distinct cultural profiles negotiate simulated scenarios
               (e.g., salary/benefits, school cellphone policy). The GUI visualizes rounds,
