@@ -2,7 +2,7 @@ import re
 from typing import Tuple
 from services.openai import get_openai_response
 
-def runSimpleDebate(
+def runSimpleNegotiate(
     model: str,
     agent1: Tuple[str, str, str],  # (name, personality, goal)
     agent2: Tuple[str, str, str],  # (name, personality, goal)
@@ -38,10 +38,10 @@ def _agent_turn(
         f"You are {agent_name}.\n"
         f"Personality: {personality}\n"
         f"Goal: {goal}\n"
-        f"Debate topic: \"{topic}\"\n\n"
+        f"Negotiation topic: \"{topic}\"\n\n"
         f"{rules}\n\n"
         "Transcript so far:\n"
-        f"{transcript_so_far or '[start of debate]'}\n\n"
+        f"{transcript_so_far or '[start of negotiation]'}\n\n"
         f"{agent_name}:"
     )
     return get_openai_response(model, prompt)
