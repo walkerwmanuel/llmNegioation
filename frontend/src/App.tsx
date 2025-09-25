@@ -45,7 +45,7 @@ export default function App() {
 
           {/* Title centered */}
           <h1 style={{ margin: 0, fontSize: "1.6rem", fontWeight: 800, flex: 1, textAlign: "center" }}>
-            🔥 Cross-Cultural Negotiation System 🔥
+            Cross-Cultural Negotiation System
           </h1>
 
           {/* Spacer to balance flex layout */}

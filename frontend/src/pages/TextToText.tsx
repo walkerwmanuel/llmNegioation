@@ -199,7 +199,7 @@ export default function TextToText() {
         "5) If referencing evidence, summarize briefly rather than citing sources.",
       rounds: 4,
       agent1: {
-        name: "Neil Sood",
+        name: "Agent A",
         persona:
           "You are Neil Sood, a 21-year-old Caucasian male undergraduate at North Carolina State University. " +
           "You are curious, reflective, and enjoy connecting technical coursework to bigger-picture societal impacts. " +
@@ -209,7 +209,7 @@ export default function TextToText() {
           "preparing students for the complexities of professional engineering work.",
       },
       agent2: {
-        name: "Kaden Nelson",
+        name: "Agent B",
         persona:
           "You are Kaden Nelson, a 21-year-old Asian male undergraduate at North Carolina State University. " +
           "You are pragmatic, efficiency-oriented, and focused on building a resume that will impress recruiters. " +
@@ -242,6 +242,32 @@ export default function TextToText() {
     [form]
   );
 
+  const onSingleRound = async () => {
+
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data: { transcript?: string } = await res.json();
+
+      // Append
+      setResult((prev: string | null) => {
+        if (data.transcript) {
+          return prev ? prev + "\n" + data.transcript : data.transcript;
+        }
+        // If there's no transcript, just return previous value
+        return prev;
+      });
+
+    } catch (err: any) {
+      setErr(err.message);
+    }
+  };
+
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitted(true);
@@ -262,6 +288,14 @@ export default function TextToText() {
       }
 
       const data: { transcript?: string } = await res.json();
+
+      setResult((prev: string | null) => {
+        if (data.transcript) {
+          return prev ? prev + "\n" + data.transcript : data.transcript;
+        }
+        // If there's no transcript, just return previous value
+        return prev;
+      });
       console.log("Backend response:", data); // print to console
       setResult(data.transcript ?? "(No transcript field returned)");
     } catch (e: any) {
@@ -277,6 +311,12 @@ export default function TextToText() {
     setResult(null);
     setErr(null);
   };
+
+
+
+
+
+
 
   /* ------------------------------- layout -------------------------------- */
 
@@ -457,6 +497,9 @@ export default function TextToText() {
               <Button type="submit">{loading ? "Submitting..." : "Submit"}</Button>
               <Button type="button" variant="outline" onClick={onReset}>
                 Reset to Defaults
+              </Button>
+              <Button type="button" onClick={onSingleRound}>
+                Run Single Round
               </Button>
             </div>
           </form>
