@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /* ----------------------- tiny local “ui” components ----------------------- */
 const colors = {
@@ -11,6 +11,8 @@ const colors = {
   muted: "rgba(232,236,241,0.7)",
   primary: "#6366f1",
   primaryHover: "#7c7ef7",
+  bubbleA: "#111a33",
+  bubbleB: "#1b233a",
 };
 
 function Card(props: React.HTMLAttributes<HTMLDivElement>) {
@@ -69,15 +71,16 @@ function CardContent(props: React.HTMLAttributes<HTMLDivElement>) {
 }
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "default" | "outline";
+  variant?: "default" | "outline" | "ghost";
+  size?: "md" | "sm";
 };
-function Button({ variant = "default", style, ...props }: ButtonProps) {
+function Button({ variant = "default", size = "md", style, ...props }: ButtonProps) {
   const base: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    height: 40,
-    padding: "0 16px",
+    height: size === "sm" ? 32 : 40,
+    padding: size === "sm" ? "0 12px" : "0 16px",
     borderRadius: 8,
     fontWeight: 600,
     cursor: "pointer",
@@ -93,6 +96,11 @@ function Button({ variant = "default", style, ...props }: ButtonProps) {
       background: "transparent",
       color: colors.text,
       border: `1px solid ${colors.border}`,
+    },
+    ghost: {
+      background: "transparent",
+      color: colors.text,
+      border: "1px solid transparent",
     },
   };
   const hover =
@@ -171,6 +179,71 @@ function Textarea({ style, ...props }: TextareaProps) {
   );
 }
 
+/* ---------------------------- settings modal ----------------------------- */
+
+function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      aria-modal
+      role="dialog"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        zIndex: 50,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(880px, 96vw)",
+          maxHeight: "90vh",
+          overflow: "auto",
+          background: colors.panel,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 12,
+          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+        }}
+      >
+        <CardHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <CardTitle>{title}</CardTitle>
+          <button
+            aria-label="Close"
+            onClick={onClose}
+            style={{ background: "transparent", border: "none", color: colors.muted, cursor: "pointer" }}
+          >
+            ×
+          </button>
+        </CardHeader>
+        <CardContent>{children}</CardContent>
+        {footer && (
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: 16, borderTop: `1px solid ${colors.border}` }}>
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ----------------------- page-specific logic & UI ------------------------ */
 
 type Agent = { name: string; persona: string; stance: string };
@@ -183,15 +256,270 @@ type FormState = {
   agent2: Agent;
 };
 
+type ChatItem =
+  | { kind: "round"; round: number }
+  | { kind: "turn"; speaker: string; content: string; side: "left" | "right" };
+
 const API_URL = "http://localhost:8025/t2t-negotiate";
 
+/* ------------------------------ helpers ---------------------------------- */
+
+// Build POST payload; ensure `transcript` is the FIRST field
+function buildPayload({
+  transcript,
+  form,
+}: {
+  transcript: string;
+  form: FormState;
+}) {
+  return {
+    existing_transcript: transcript, // first parameter per your requirement
+    model: form.model,
+    topic: form.topic,
+    rules: form.rules,
+    rounds: form.rounds,
+    agent1: {
+      name: form.agent1.name,
+      personality: form.agent1.persona,
+      goal: form.agent1.stance,
+    },
+    agent2: {
+      name: form.agent2.name,
+      personality: form.agent2.persona,
+      goal: form.agent2.stance,
+    },
+  };
+}
+
+// Convert chat items to the backend transcript format
+function serializeTranscript(items: ChatItem[]): string {
+  let t = "";
+  for (const it of items) {
+    if (it.kind === "round") {
+      if (t.endsWith("\n\n")) {
+        t += `=== Round ${it.round} ===\n\n`;
+      } else {
+        t += `\n=== Round ${it.round} ===\n\n`;
+      }
+    } else if (it.kind === "turn") {
+      t += `${it.speaker}:\n${it.content}\n\n`;
+    }
+  }
+  return t.trim();
+}
+
+// NDJSON streaming POST helper
+async function postStream(
+  url: string,
+  body: any,
+  onMessage: (msg: any) => void
+) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/x-ndjson",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || ""; // keep incomplete tail
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        onMessage(JSON.parse(trimmed));
+      } catch {
+        // ignore malformed chunk
+      }
+    }
+  }
+
+  const tail = buffer.trim();
+  if (tail) {
+    try { onMessage(JSON.parse(tail)); } catch {}
+  }
+}
+
+/* ------------------------------ chat pieces ------------------------------ */
+
+function Avatar({ name, side }: { name: string; side: "left" | "right" }) {
+  const initials = (name || "?")
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: side === "left" ? colors.primary : "#334155",
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: 700,
+        flex: "0 0 auto",
+      }}
+      title={name}
+    >
+      {initials}
+    </div>
+  );
+}
+
+function ChatBubble({
+  name,
+  content,
+  side,
+  isEditing,
+  onEdit,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  name: string;
+  content: string;
+  side: "left" | "right";
+  isEditing: boolean;
+  onEdit: () => void;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        justifyContent: side === "left" ? "flex-start" : "flex-end",
+      }}
+    >
+      {side === "left" && <Avatar name={name} side={side} />}
+      <div
+        style={{
+          maxWidth: "70%",
+          padding: "10px 12px",
+          borderRadius: 12,
+          background: side === "left" ? colors.bubbleA : colors.bubbleB,
+          border: `1px solid ${colors.border}`,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 6,
+            color: colors.muted,
+            fontSize: 12,
+          }}
+        >
+          <div style={{ flex: 1 }}>{name}</div>
+          {!isEditing ? (
+            <button
+              title="Edit message"
+              onClick={onEdit}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: colors.muted,
+                cursor: "pointer",
+              }}
+            >
+              ✎
+            </button>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={onSave}>
+                Save
+              </Button>
+            </>
+          )}
+        </div>
+
+        {!isEditing ? (
+          <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{content}</div>
+        ) : (
+          <textarea
+            value={content}
+            onChange={(e) => onChange(e.target.value)}
+            style={{
+              width: "100%",
+              minHeight: 100,
+              padding: 8,
+              borderRadius: 8,
+              border: `1px solid ${colors.border}`,
+              background: colors.panelAlt,
+              color: colors.text,
+              outline: "none",
+              resize: "vertical",
+            }}
+          />
+        )}
+      </div>
+      {side === "right" && <Avatar name={name} side={side} />}
+    </div>
+  );
+}
+
+function RoundDivider({ round }: { round: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
+      <div style={{ height: 1, background: colors.border, flex: 1 }} />
+      <div
+        style={{
+          fontSize: 12,
+          color: colors.muted,
+          padding: "2px 10px",
+          borderRadius: 999,
+          border: `1px solid ${colors.border}`,
+          background: colors.panelAlt,
+        }}
+      >
+        Round {round}
+      </div>
+      <div style={{ height: 1, background: colors.border, flex: 1 }} />
+    </div>
+  );
+}
+
+/* --------------------------------- page ---------------------------------- */
+
 export default function TextToText() {
+  // defaults for negotiation parameters
   const defaults: FormState = useMemo(
     () => ({
       model: "gpt-4o-mini",
       topic: "Is senior design for electrical and computer engineers actually useful?",
       rules:
-        "DEBATE RULES:\n" +
+        "NEGOTIATION RULES:\n" +
         "1) Respond in EXACTLY two sentences per turn.\n" +
         "2) Address the topic directly; cite concrete practices, examples, or trade-offs.\n" +
         "3) No markdown, no emojis, no bullet points.\n" +
@@ -222,82 +550,71 @@ export default function TextToText() {
     []
   );
 
+  // editable parameters (shown in settings)
   const [form, setForm] = useState<FormState>(defaults);
-  const [submitted, setSubmitted] = useState(false);
 
-  // NEW: request state
-  const [result, setResult] = useState<string | null>(null);
+  // UI states
+  const [openSettings, setOpenSettings] = useState(false);
+  const [messages, setMessages] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const payload = useMemo(
-    () => ({
-      model: form.model,
-      topic: form.topic,
-      rules: form.rules,
-      rounds: form.rounds,
-      agent1: [form.agent1.name, form.agent1.persona, form.agent1.stance],
-      agent2: [form.agent2.name, form.agent2.persona, form.agent2.stance],
-    }),
-    [form]
-  );
+  // editing state
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState<string>("");
 
-  const onSingleRound = async () => {
+  // chat scroll state
+  const chatRef = useRef<HTMLDivElement | null>(null);
+  const [stickToBottom, setStickToBottom] = useState(true);
 
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+  // keep at bottom only if user hasn't scrolled up
+  useEffect(() => {
+    if (!stickToBottom) return;
+    const el = chatRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, stickToBottom]);
 
-      const data: { transcript?: string } = await res.json();
-
-      // Append
-      setResult((prev: string | null) => {
-        if (data.transcript) {
-          return prev ? prev + "\n" + data.transcript : data.transcript;
-        }
-        // If there's no transcript, just return previous value
-        return prev;
-      });
-
-    } catch (err: any) {
-      setErr(err.message);
-    }
+  const handleChatScroll = () => {
+    const el = chatRef.current;
+    if (!el) return;
+    const threshold = 40; // px
+    const atBottom =
+      el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
+    setStickToBottom(atBottom);
   };
 
+  const isAgent1 = (speaker: string) =>
+    speaker.trim().toLowerCase() === form.agent1.name.trim().toLowerCase();
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitted(true);
+  // Start negotiation (fresh)
+  const onStart = async () => {
     setErr(null);
-    setResult(null);
+    setMessages([]);
+    setEditingIndex(null);
+    setDraft("");
+    setStickToBottom(true);
     setLoading(true);
 
     try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`HTTP ${res.status}: ${text}`);
-      }
-
-      const data: { transcript?: string } = await res.json();
-
-      setResult((prev: string | null) => {
-        if (data.transcript) {
-          return prev ? prev + "\n" + data.transcript : data.transcript;
+      await postStream(
+        API_URL,
+        buildPayload({ transcript: "", form }),
+        (msg) => {
+          if (msg.type === "round") {
+            setMessages((prev) => [...prev, { kind: "round", round: msg.round }]);
+            return;
+          }
+          if (msg.type === "turn") {
+            const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
+            setMessages((prev) => [
+              ...prev,
+              { kind: "turn", speaker: msg.speaker, content: msg.content, side },
+            ]);
+            return;
+          }
         }
-        // If there's no transcript, just return previous value
-        return prev;
-      });
-      console.log("Backend response:", data); // print to console
-      setResult(data.transcript ?? "(No transcript field returned)");
+      );
     } catch (e: any) {
       setErr(e?.message ?? "Request failed");
     } finally {
@@ -305,277 +622,349 @@ export default function TextToText() {
     }
   };
 
-  const onReset = () => {
-    setForm(defaults);
-    setSubmitted(false);
-    setResult(null);
+  // Save edit and continue streaming the rest
+  const onSaveEdit = async () => {
+    if (editingIndex === null) return;
+    // 1) apply edit locally
+    const updated = [...messages];
+    const item = updated[editingIndex];
+    if (item && item.kind === "turn") {
+      updated[editingIndex] = { ...item, content: draft };
+    }
+    // 2) keep only up-to-and-including this edited message
+    const prefix = updated.slice(0, editingIndex + 1);
+    setMessages(prefix);
+    setEditingIndex(null);
+    setDraft("");
     setErr(null);
+    setStickToBottom(true);
+    setLoading(true);
+
+    // 3) serialize and call backend to extend
+    const transcript = serializeTranscript(prefix);
+
+    try {
+      await postStream(
+        API_URL,
+        buildPayload({ transcript, form }),
+        (msg) => {
+          if (msg.type === "round") {
+            setMessages((prev) => [...prev, { kind: "round", round: msg.round }]);
+            return;
+          }
+          if (msg.type === "turn") {
+            const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
+            setMessages((prev) => [
+              ...prev,
+              { kind: "turn", speaker: msg.speaker, content: msg.content, side },
+            ]);
+            return;
+          }
+        }
+      );
+    } catch (e: any) {
+      setErr(e?.message ?? "Request failed");
+    } finally {
+      setLoading(false);
+    }
   };
-
-
-
-
-
-
 
   /* ------------------------------- layout -------------------------------- */
 
   return (
     <div
       style={{
-        padding: "32px 24px",
-        maxWidth: 980,
-        margin: "0 auto",
+        width: "90vw",
+        height: "90vh",
+        margin: "5vh auto",
+        padding: "2vw",
+        boxSizing: "border-box",
         color: colors.text,
+        position: "relative",
+        // no page scroll; chat area scrolls
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Configure Bot–Bot Debate</h2>
+      {/* Top bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Bot–Bot Negotiation</h2>
+
+        {/* Settings gear (SVG) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Settings"
+          onClick={() => setOpenSettings(true)}
+          style={{ display: "inline-flex", gap: 8 }}
+          title="Edit negotiation parameters"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={colors.text}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ marginRight: 6 }}
+          >
+            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 9 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82h0A1.65 1.65 0 0 0 20.91 11H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+          </svg>
+          Settings
+        </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Debate Parameters</CardTitle>
+      {/* Main: Start button + chat transcript */}
+      <Card style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <CardHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <CardTitle>Negotiation</CardTitle>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button onClick={onStart} disabled={loading}>{loading ? "Running…" : "Start"}</Button>
+          </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit}>
-            {/* Top row: Model / Rounds */}
+
+        {/* minHeight: 0 here is CRITICAL so the inner scroller can actually scroll */}
+        <CardContent style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+          {err && (
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: 16,
+                padding: 12,
+                borderRadius: 8,
+                border: "1px solid #7f1d1d",
+                background: "#1f1111",
+                color: "#fecaca",
+                marginBottom: 12,
+                flex: "0 0 auto",
               }}
             >
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                    Model
-                  </label>
-                  <Input
-                    value={form.model}
-                    onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-                    placeholder="e.g., gpt-4o-mini"
-                  />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                    Rounds
-                  </label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={form.rounds}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)),
-                      }))
-                    }
-                  />
-                </div>
+              {err}
+            </div>
+          )}
+
+          <div
+            ref={chatRef}
+            onScroll={handleChatScroll}
+            style={{
+              background: colors.panelAlt,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 12,
+              padding: 12,
+              flex: 1,                 // fills remaining height
+              overflowY: "auto",       // scrolls only the chat area
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              minHeight: 0,            // important for scrolling
+            }}
+          >
+            {messages.length === 0 && !loading && (
+              <div style={{ color: colors.muted, fontSize: 14 }}>
+                Transcript will appear here.
               </div>
+            )}
 
-              {/* Topic */}
-              <div>
-                <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                  Topic
-                </label>
-                <Input
-                  value={form.topic}
-                  onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))}
-                  placeholder="Debate topic"
-                />
-              </div>
-            </div>
-
-            {/* Agent 1 */}
-            <Card style={{ marginTop: 16 }}>
-              <CardHeader>
-                <CardTitle>Agent 1</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                      Name
-                    </label>
-                    <Input
-                      value={form.agent1.name}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                      Stance (1–2 sentences)
-                    </label>
-                    <Input
-                      value={form.agent1.stance}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div style={{ marginTop: 12 }}>
-                  <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                    Persona / Background
-                  </label>
-                  <Textarea
-                    rows={4}
-                    value={form.agent1.persona}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))
-                    }
+            {messages.map((m, i) =>
+              m.kind === "round" ? (
+                <RoundDivider key={`r-${i}`} round={m.round} />
+              ) : (
+                <div
+                  key={`t-${i}`}
+                  style={{
+                    display: "flex",
+                    justifyContent: m.side === "left" ? "flex-start" : "flex-end",
+                  }}
+                >
+                  <ChatBubble
+                    name={m.speaker}
+                    content={editingIndex === i ? draft : m.content}
+                    side={m.side}
+                    isEditing={editingIndex === i}
+                    onEdit={() => {
+                      setEditingIndex(i);
+                      setDraft(m.content);
+                      setStickToBottom(false); // let user edit without snapping to bottom
+                    }}
+                    onChange={(v) => setDraft(v)}
+                    onCancel={() => {
+                      setEditingIndex(null);
+                      setDraft("");
+                    }}
+                    onSave={onSaveEdit}
                   />
                 </div>
-              </CardContent>
-            </Card>
+              )
+            )}
+          </div>
 
-            {/* Agent 2 */}
-            <Card style={{ marginTop: 16 }}>
-              <CardHeader>
-                <CardTitle>Agent 2</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                      Name
-                    </label>
-                    <Input
-                      value={form.agent2.name}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                      Stance (1–2 sentences)
-                    </label>
-                    <Input
-                      value={form.agent2.stance}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div style={{ marginTop: 12 }}>
-                  <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                    Persona / Background
-                  </label>
-                  <Textarea
-                    rows={4}
-                    value={form.agent2.persona}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Rules */}
-            <div style={{ marginTop: 16 }}>
-              <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                Rules
-              </label>
-              <Textarea
-                rows={6}
-                value={form.rules}
-                onChange={(e) => setForm((f) => ({ ...f, rules: e.target.value }))}
-              />
+          {loading && (
+            <div style={{ marginTop: 8, fontSize: 12, color: colors.muted }}>
+              Streaming transcript…
             </div>
-
-            {/* Actions */}
-            <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
-              <Button type="submit">{loading ? "Submitting..." : "Submit"}</Button>
-              <Button type="button" variant="outline" onClick={onReset}>
-                Reset to Defaults
-              </Button>
-              <Button type="button" onClick={onSingleRound}>
-                Run Single Round
-              </Button>
-            </div>
-          </form>
+          )}
         </CardContent>
       </Card>
 
-      {/* Request Preview (kept, but now it really sends) */}
-      {submitted && (
+      {/* Settings modal */}
+      <Modal
+        open={openSettings}
+        onClose={() => setOpenSettings(false)}
+        title="Negotiation Settings"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setOpenSettings(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => setOpenSettings(false)}>Save</Button>
+          </>
+        }
+      >
+        {/* Basic parameters */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+              Model
+            </label>
+            <Input
+              value={form.model}
+              onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+              placeholder="e.g., gpt-4o-mini"
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+              Rounds
+            </label>
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              value={form.rounds}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)),
+                }))
+              }
+            />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+            Topic
+          </label>
+          <Input
+            value={form.topic}
+            onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))}
+            placeholder="Negotiation topic"
+          />
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+            Rules
+          </label>
+          <Textarea
+            rows={6}
+            value={form.rules}
+            onChange={(e) => setForm((f) => ({ ...f, rules: e.target.value }))}
+          />
+        </div>
+
+        {/* Agent 1 */}
         <Card style={{ marginTop: 16 }}>
           <CardHeader>
-            <CardTitle>Request Payload</CardTitle>
+            <CardTitle>Agent 1</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre
-              style={{
-                margin: 0,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                fontSize: 12,
-                background: colors.panelAlt,
-                border: `1px solid ${colors.border}`,
-                padding: 12,
-                borderRadius: 8,
-              }}
-            >
-              {JSON.stringify(payload, null, 2)}
-            </pre>
-            <p style={{ marginTop: 8, color: colors.muted, fontSize: 13 }}>
-              Posting to <code>{API_URL}</code>.
-            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+                  Name
+                </label>
+                <Input
+                  value={form.agent1.name}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))
+                  }
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+                  Stance (1–2 sentences)
+                </label>
+                <Input
+                  value={form.agent1.stance}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))
+                  }
+                />
+              </div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+                Persona / Background
+              </label>
+              <Textarea
+                rows={4}
+                value={form.agent1.persona}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))
+                }
+              />
+            </div>
           </CardContent>
         </Card>
-      )}
 
-      {/* Result / Error */}
-      {loading && (
+        {/* Agent 2 */}
         <Card style={{ marginTop: 16 }}>
           <CardHeader>
-            <CardTitle>Running Debate…</CardTitle>
-          </CardHeader>
-          <CardContent>Contacting backend and generating transcript.</CardContent>
-        </Card>
-      )}
-
-      {err && (
-        <Card style={{ marginTop: 16, borderColor: "#b91c1c" }}>
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-          </CardHeader>
-          <CardContent style={{ color: "#fecaca" }}>{err}</CardContent>
-        </Card>
-      )}
-
-      {result && (
-        <Card style={{ marginTop: 16 }}>
-          <CardHeader>
-            <CardTitle>Backend Response (Transcript)</CardTitle>
+            <CardTitle>Agent 2</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre
-              style={{
-                margin: 0,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                fontSize: 14,
-                background: colors.panelAlt,
-                border: `1px solid ${colors.border}`,
-                padding: 12,
-                borderRadius: 8,
-              }}
-            >
-              {result}
-            </pre>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+                  Name
+                </label>
+                <Input
+                  value={form.agent2.name}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))
+                  }
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+                  Stance (1–2 sentences)
+                </label>
+                <Input
+                  value={form.agent2.stance}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))
+                  }
+                />
+              </div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: "block", fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+                Persona / Background
+              </label>
+              <Textarea
+                rows={4}
+                value={form.agent2.persona}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))
+                }
+              />
+            </div>
           </CardContent>
         </Card>
-      )}
+      </Modal>
     </div>
   );
 }
