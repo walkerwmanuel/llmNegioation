@@ -273,7 +273,7 @@ function buildPayload({
   form: FormState;
 }) {
   return {
-    existing_transcript: transcript, // first parameter per your requirement
+    existing_transcript: transcript,
     model: form.model,
     topic: form.topic,
     rules: form.rules,
@@ -308,19 +308,21 @@ function serializeTranscript(items: ChatItem[]): string {
   return t.trim();
 }
 
-// NDJSON streaming POST helper
+// NDJSON streaming POST helper (supports AbortController)
 async function postStream(
   url: string,
   body: any,
-  onMessage: (msg: any) => void
+  onMessage: (msg: any) => void,
+  signal?: AbortSignal
 ) {
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Accept": "application/x-ndjson",
+      Accept: "application/x-ndjson",
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok || !res.body) {
@@ -338,7 +340,7 @@ async function postStream(
 
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
-    buffer = lines.pop() || ""; // keep incomplete tail
+    buffer = lines.pop() || "";
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -346,14 +348,16 @@ async function postStream(
       try {
         onMessage(JSON.parse(trimmed));
       } catch {
-        // ignore malformed chunk
+        /* swallow malformed chunk */
       }
     }
   }
 
   const tail = buffer.trim();
   if (tail) {
-    try { onMessage(JSON.parse(tail)); } catch {}
+    try {
+      onMessage(JSON.parse(tail));
+    } catch {}
   }
 }
 
@@ -559,6 +563,10 @@ export default function TextToText() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // pause/resume state
+  const [paused, setPaused] = useState(false);
+  const controllerRef = useRef<AbortController | null>(null);
+
   // editing state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState<string>("");
@@ -567,7 +575,6 @@ export default function TextToText() {
   const chatRef = useRef<HTMLDivElement | null>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
 
-  // keep at bottom only if user hasn't scrolled up
   useEffect(() => {
     if (!stickToBottom) return;
     const el = chatRef.current;
@@ -575,12 +582,18 @@ export default function TextToText() {
     el.scrollTop = el.scrollHeight;
   }, [messages, stickToBottom]);
 
+  // abort any in-flight stream on unmount
+  useEffect(() => {
+    return () => {
+      controllerRef.current?.abort();
+    };
+  }, []);
+
   const handleChatScroll = () => {
     const el = chatRef.current;
     if (!el) return;
-    const threshold = 40; // px
-    const atBottom =
-      el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
+    const threshold = 40;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
     setStickToBottom(atBottom);
   };
 
@@ -594,7 +607,11 @@ export default function TextToText() {
     setEditingIndex(null);
     setDraft("");
     setStickToBottom(true);
+    setPaused(false);
     setLoading(true);
+
+    const controller = new AbortController();
+    controllerRef.current = controller;
 
     try {
       await postStream(
@@ -613,35 +630,41 @@ export default function TextToText() {
             ]);
             return;
           }
-        }
+        },
+        controller.signal
       );
     } catch (e: any) {
-      setErr(e?.message ?? "Request failed");
+      if (e?.name === "AbortError") {
+        // paused: no error message
+      } else {
+        setErr(e?.message ?? "Request failed");
+      }
     } finally {
       setLoading(false);
+      controllerRef.current = null;
     }
   };
 
-  // Save edit and continue streaming the rest
-  const onSaveEdit = async () => {
-    if (editingIndex === null) return;
-    // 1) apply edit locally
-    const updated = [...messages];
-    const item = updated[editingIndex];
-    if (item && item.kind === "turn") {
-      updated[editingIndex] = { ...item, content: draft };
-    }
-    // 2) keep only up-to-and-including this edited message
-    const prefix = updated.slice(0, editingIndex + 1);
-    setMessages(prefix);
-    setEditingIndex(null);
-    setDraft("");
-    setErr(null);
-    setStickToBottom(true);
-    setLoading(true);
+  // Pause streaming in-place
+  const onPause = () => {
+    if (!loading || paused) return;
+    controllerRef.current?.abort();
+    setPaused(true);
+    setLoading(false);
+  };
 
-    // 3) serialize and call backend to extend
-    const transcript = serializeTranscript(prefix);
+  // Resume from current transcript
+  const onResume = async () => {
+    if (!paused) return;
+    const transcript = serializeTranscript(messages);
+
+    setErr(null);
+    setPaused(false);
+    setLoading(true);
+    setStickToBottom(true);
+
+    const controller = new AbortController();
+    controllerRef.current = controller;
 
     try {
       await postStream(
@@ -660,12 +683,71 @@ export default function TextToText() {
             ]);
             return;
           }
-        }
+        },
+        controller.signal
       );
     } catch (e: any) {
-      setErr(e?.message ?? "Request failed");
+      if (e?.name === "AbortError") {
+        // paused again
+      } else {
+        setErr(e?.message ?? "Request failed");
+      }
     } finally {
       setLoading(false);
+      controllerRef.current = null;
+    }
+  };
+
+  // Save edit and continue streaming the rest
+  const onSaveEdit = async () => {
+    if (editingIndex === null) return;
+
+    // apply edit locally
+    const updated = [...messages];
+    const item = updated[editingIndex];
+    if (item && item.kind === "turn") {
+      updated[editingIndex] = { ...item, content: draft };
+    }
+    const prefix = updated.slice(0, editingIndex + 1);
+    setMessages(prefix);
+    setEditingIndex(null);
+    setDraft("");
+    setErr(null);
+    setStickToBottom(true);
+    setPaused(false);
+    setLoading(true);
+
+    const transcript = serializeTranscript(prefix);
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
+    try {
+      await postStream(
+        API_URL,
+        buildPayload({ transcript, form }),
+        (msg) => {
+          if (msg.type === "round") {
+            setMessages((prev) => [...prev, { kind: "round", round: msg.round }]);
+            return;
+          }
+          if (msg.type === "turn") {
+            const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
+            setMessages((prev) => [
+              ...prev,
+              { kind: "turn", speaker: msg.speaker, content: msg.content, side },
+            ]);
+            return;
+          }
+        },
+        controller.signal
+      );
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        setErr(e?.message ?? "Request failed");
+      }
+    } finally {
+      setLoading(false);
+      controllerRef.current = null;
     }
   };
 
@@ -681,7 +763,6 @@ export default function TextToText() {
         boxSizing: "border-box",
         color: colors.text,
         position: "relative",
-        // no page scroll; chat area scrolls
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -723,11 +804,12 @@ export default function TextToText() {
         <CardHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <CardTitle>Negotiation</CardTitle>
           <div style={{ display: "flex", gap: 8 }}>
-            <Button onClick={onStart} disabled={loading}>{loading ? "Running…" : "Start"}</Button>
+            <Button onClick={onStart} disabled={loading || paused}>{loading && !paused ? "Running…" : "Start"}</Button>
+            <Button variant="outline" onClick={onPause} disabled={!loading || paused}>Pause</Button>
+            <Button onClick={onResume} disabled={!paused}>Resume</Button>
           </div>
         </CardHeader>
 
-        {/* minHeight: 0 here is CRITICAL so the inner scroller can actually scroll */}
         <CardContent style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
           {err && (
             <div
@@ -753,12 +835,12 @@ export default function TextToText() {
               border: `1px solid ${colors.border}`,
               borderRadius: 12,
               padding: 12,
-              flex: 1,                 // fills remaining height
-              overflowY: "auto",       // scrolls only the chat area
+              flex: 1,
+              overflowY: "auto",
               display: "flex",
               flexDirection: "column",
               gap: 14,
-              minHeight: 0,            // important for scrolling
+              minHeight: 0,
             }}
           >
             {messages.length === 0 && !loading && (
@@ -786,7 +868,7 @@ export default function TextToText() {
                     onEdit={() => {
                       setEditingIndex(i);
                       setDraft(m.content);
-                      setStickToBottom(false); // let user edit without snapping to bottom
+                      setStickToBottom(false);
                     }}
                     onChange={(v) => setDraft(v)}
                     onCancel={() => {
@@ -802,7 +884,12 @@ export default function TextToText() {
 
           {loading && (
             <div style={{ marginTop: 8, fontSize: 12, color: colors.muted }}>
-              Streaming transcript…
+              {paused ? "Paused." : "Streaming transcript…"}
+            </div>
+          )}
+          {!loading && paused && (
+            <div style={{ marginTop: 8, fontSize: 12, color: colors.muted }}>
+              Paused. Click Resume to continue.
             </div>
           )}
         </CardContent>
