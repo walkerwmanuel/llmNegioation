@@ -13,35 +13,45 @@ export default function Home() {
           </div>
           <div className="links">
             <a href="#features">How It Works</a>
-            <a href="#requirements">Requirements</a>
-            <a href="#milestones">Milestones</a>
-            <a href="#team">Team</a>
           </div>
         </div>
       </div>
 
-      {/* HERO */}
-      <header className="container hero">
-        <div className="hero-grid">
-          <div className="hero-card">
-            <h1>Cross-Cultural Negotiation System with LLM Agents</h1>
-            <p className="lead">
-              Train, benchmark, and deploy culturally-aware AI negotiation agents. Practice human–bot and
-              bot–bot scenarios with text and voice, real-time visualization, and research-ready logging.
-            </p>
-            <div className="cta">
-              <a className="btn primary" href="#milestones">View Milestones</a>
-              <a className="btn" href="#requirements">See Requirements</a>
-            </div>
-          </div>
-
-          <div className="pills">
-            <span className="pill">LLM Agents • OpenAI API</span>
-            <span className="pill">Text &amp; Voice • Real-time GUI</span>
-            <span className="pill">Experiment Logging • Analytics</span>
-          </div>
+      {/* CTA SECTION */}
+      <section className="container section">
+        <div
+          className="cta-card"
+          style={{
+            textAlign: "center",
+            margin: "2rem 0",
+            padding: "1.5rem",
+            borderRadius: "1rem",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            color: "#fff",
+          }}
+        >
+          <h2 style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}>
+            🔥 Check Out the Text-to-Text Bot v1 🔥
+          </h2>
+          <p className="muted" style={{ marginBottom: "1rem", opacity: 0.9 }}>
+            Watch two AI agents debate a topic in real-time!
+          </p>
+          <Link
+            to="/text-to-text"
+            className="btn primary"
+            style={{
+              fontSize: "1.2rem",
+              padding: "0.75rem 1.5rem",
+              display: "inline-block",
+              textDecoration: "none",
+            }}
+          >
+            Try It Now
+          </Link>
         </div>
-      </header>
+      </section>
 
       {/* HOW IT WORKS */}
       <section id="features" className="container section">
@@ -51,9 +61,7 @@ export default function Home() {
         <div className="steps">
           <div className="step-box">
             <div className="badge-num">1</div>
-            <div className="step-title">
-              <Link to="/text-to-text">Bot–Bot Negotiation (Text vs. Text)</Link>
-            </div>
+            <div className="step-title">Bot-Bot Negotiation (Text vs. Text)</div>
             <p className="muted">
               Two LLM agents with distinct cultural profiles negotiate simulated scenarios
               (e.g., salary/benefits, school cellphone policy). The GUI visualizes rounds,
@@ -89,88 +97,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* REQUIREMENTS */}
-      <section id="requirements" className="container section">
-        <h2 className="title">Key Project Requirements</h2>
-        <div className="card">
-          <div className="grid-2">
-            <ul>
-              <li>Invoke LLM APIs (e.g., OpenAI) to create working negotiation agents.</li>
-              <li>GUIs that reflect, in real time, the negotiation process.</li>
-              <li>Output statistics and archive runtime results.</li>
-            </ul>
-            <ul>
-              <li>Support speech-to-text input for human users.</li>
-              <li>Respond via both text and voice.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* MILESTONES */}
-      <section id="milestones" className="container section">
-        <h2 className="title">Milestones &amp; Timeline</h2>
-        <div className="chips">
-          <div className="chip">
-            <span className="when">End of Month 2</span>
-            <span>Milestone 1 — Bot–Bot Platform with GUI</span>
-          </div>
-          <div className="chip">
-            <span className="when">End of Fall</span>
-            <span>Milestone 2 — Human–Bot (Voice vs. Text)</span>
-          </div>
-          <div className="chip">
-            <span className="when">Spring Midterm</span>
-            <span>Milestone 3 — Real-Time (Voice vs. Voice)</span>
-          </div>
-        </div>
-      </section>
-
-      {/* TEAM */}
-      <section id="team" className="container section">
-        <h2 className="title">Sponsor &amp; Mentor</h2>
-        <div className="grid-2">
-          <div className="card">
-            <h3 style={{ margin: "0 0 0.5rem 0" }}>Sponsor</h3>
-            <p className="muted" style={{ margin: 0 }}>
-              <strong>Individual NC State Faculty</strong><br />
-              <a href="mailto:chauwai.wong@ncsu.edu">chauwai.wong@ncsu.edu</a>
-            </p>
-          </div>
-          <div className="card">
-            <h3 style={{ margin: "0 0 0.5rem 0" }}>Mentor</h3>
-            <p className="muted" style={{ margin: 0 }}>
-              <strong>Chau-Wai Wong</strong> (weekly), collaborator (monthly)<br />
-              <a href="mailto:chauwai.wong@ncsu.edu">chauwai.wong@ncsu.edu</a><br />
-              <em>Meetings:</em> Weekly in-person (Zoom backup), Discord for Q&amp;A
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* STATS */}
-      <section className="container section">
-        <h2 className="title">Early Targets</h2>
-        <div className="stats">
-          <div className="stat">
-            <div className="n">2+</div>
-            <div className="muted">Agent Profiles (init)</div>
-          </div>
-          <div className="stat">
-            <div className="n">5+</div>
-            <div className="muted">Negotiation Scenarios</div>
-          </div>
-          <div className="stat">
-            <div className="n">100+</div>
-            <div className="muted">Logged Rounds (pilot)</div>
-          </div>
-        </div>
-      </section>
-
-      <footer className="container">
-        © {new Date().getFullYear()} NC State University — Cross-Cultural Negotiation System
-      </footer>
     </>
   );
 }
