@@ -58,12 +58,14 @@ export default function ChatBubble({
         gap: 10,
         alignItems: "flex-start",
         justifyContent: side === "left" ? "flex-start" : "flex-end",
+        width: "100%",
       }}
     >
       {side === "left" && <Avatar name={name} side={side} />}
       <div
         style={{
-          maxWidth: "70%",
+          maxWidth: isEditing ? "50vw" : "70%",
+          width: "100%",
           padding: "10px 12px",
           borderRadius: 12,
           background: side === "left" ? colors.bubbleA : colors.bubbleB,
@@ -109,8 +111,8 @@ export default function ChatBubble({
             value={content}
             onChange={(e) => onChange(e.target.value)}
             style={{
-              width: "100%",
-              minHeight: 100,
+              width: "100%",    // NEIL CHANGE
+              minHeight: "150px",
               padding: 8,
               borderRadius: 8,
               border: `1px solid ${colors.border}`,
