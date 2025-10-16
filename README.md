@@ -47,8 +47,8 @@ python3 -m venv .venv         # MacOS
 Activate your virtual environment:
 
 ```bash
-.\.venv\Scripts\activate.bat. # Windows 
-source .venv/bin/activate.    # MacOS 
+.\.venv\Scripts\activate.bat # Windows 
+source .venv/bin/activate    # MacOS 
 ```
 
 Finally, launch the backend server:
