@@ -156,6 +156,60 @@ export default function TextToText() {
     setStickToBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 40);
   };
 
+  useEffect(() => {     // NEIL CHANGE
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if(target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable){
+        if(openSettings || editingIndex !== null){
+          if(event.code === "Enter"){
+            event.preventDefault();
+            if(editingIndex !== null) onSaveEdit();
+            else if(openSettings) setOpenSettings(false);
+          } else if(event.code === "Escape"){
+            event.preventDefault();
+            if(editingIndex !== null){
+              setEditingIndex(null);
+              setDraft("");
+            } else if(openSettings) setOpenSettings(false);
+          }
+        }
+        return;
+      }
+      //Enter = start run
+      if(event.code === "Enter"){
+        event.preventDefault();
+        if(!loading && !paused) onStart();
+        return;
+      }
+      //Space (pause/resume)
+      if(event.code === "Space"){
+        event.preventDefault();
+        if(loading && !paused) onPause();
+        else if(paused) onResume();
+      }
+      // 's' = open settings
+      else if(event.key.toLowerCase() === 's'){
+        event.preventDefault();
+        setOpenSettings(true);
+      }
+      // 'e' = edit last response
+      else if(event.key.toLowerCase() === 'e'){
+        event.preventDefault();
+        const lastIndex = messages.length - 1;
+        if(lastIndex >= 0){
+          const lastMessage = messages[lastIndex];
+          if(lastMessage.kind === "turn"){
+            setEditingIndex(lastIndex);
+            setDraft(lastMessage.content);
+            setStickToBottom(false);
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [messages, loading, paused]);
+
   const isAgent1 = (s: string) => s.trim().toLowerCase() === form.agent1.name.trim().toLowerCase();
 
   const onStart = async () => {
