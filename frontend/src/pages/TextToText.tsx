@@ -132,6 +132,7 @@ export default function TextToText() {
 
   const [form, setForm] = useState<FormState>(defaults);
   const [openSettings, setOpenSettings] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -329,8 +330,36 @@ export default function TextToText() {
     <div style={{ width: "90vw", height: "90vh", margin: "5vh auto", color: colors.text, display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Bot–Bot Negotiation</h2>
-        <Button variant="ghost" size="sm" onClick={() => setOpenSettings(true)}>⚙ Settings</Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button variant="ghost" size="sm" onClick={() => {setShowShortcuts(false); setOpenSettings(true);}}>⚙ Settings</Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowShortcuts((v) => !v)}>? Keyboard Shortcuts</Button>
+        </div>
       </div>
+
+      {showShortcuts && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "32px",
+            fontSize: 15,
+            fontWeight: 500,
+            background: colors.panelAlt,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 8,
+            padding: "8px 12px",
+            marginBottom: 12,
+            color: colors.muted,
+          }}
+        >
+          <span><b>Enter / Return</b> = Start / Restart Negotiation Run </span>   
+          <span><b>Space</b> = Pause / Resume </span>    
+          <span><b>'S'</b> = Open Settings </span>  
+          <span><b>'E'</b> = Edit Last Response </span>   
+        </div>
+      )}
 
       <Card style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <CardHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
