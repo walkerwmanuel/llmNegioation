@@ -30,7 +30,10 @@ type ChatItem =
       prevContent?: string;
     };
 
-const API_URL = "http://75.58.61.51:8025/t2t-negotiate";
+const API_URL =
+typeof window !== "undefined" && window.location.protocol === "http:"
+  ? "http://75.58.61.51:8025/t2t-negotiate"
+  : "/api/negotiate/t2t-negotiate";
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
   return {
