@@ -30,7 +30,7 @@ type ChatItem =
       prevContent?: string;
     };
 
-const API_URL = "http://75.58.61.51:8025/t2t-negotiate";
+const API_URL = "https://workshops-dimensional-economic-counsel.trycloudflare.com/t2t-negotiate";
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
   return {
