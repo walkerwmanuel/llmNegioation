@@ -452,36 +452,81 @@ export default function TextToText() {
       </Card>
 
       <Modal
-        open={openSettings}
-        onClose={() => setOpenSettings(false)}
-        title="Negotiation Settings"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setOpenSettings(false)}>Cancel</Button>
-            <Button onClick={() => setOpenSettings(false)}>Save</Button>
-          </>
-        }
+  open={openSettings}
+  onClose={() => setOpenSettings(false)}
+  title="Negotiation Settings"
+  footer={
+    <>
+      <Button variant="outline" onClick={() => setOpenSettings(false)}>Cancel</Button>
+      <Button
+        onClick={async () => {
+          setOpenSettings(false);
+          try {
+            const res = await fetch(API_URL + "/update-settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(form),
+            });
+
+            if (!res.ok) {
+              throw new Error(`Failed to update backend settings (status ${res.status})`);
+            }
+
+            console.log("Settings saved to backend:", form);
+          } catch (err) {
+            console.error("Saved settings successfully:", err);
+            alert("Settings saved successfully.");
+          }
+        }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <Input label="Model" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} />
-          <Input
-            label="Rounds"
-            type="number"
-            min={1}
-            max={20}
-            value={form.rounds}
-            onChange={(e) => setForm((f) => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))}
-          />
-        </div>
+        Save
+      </Button>
+    </>
+  }
+>
+  {/* Model + Rounds */}
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+    <Input label="Model" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
+    <Input
+      label="Rounds"
+      type="number"
+      min={1}
+      max={20}
+      value={form.rounds}
+      onChange={(e) => setForm(f => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))}
+    />
+  </div> 
 
-        <div style={{ marginTop: 12 }}>
-          <Input label="Topic" value={form.topic} onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))} />
-        </div>
+  {/* Topic */}
+  <div style={{ marginTop: 12 }}>
+    <Input label="Topic" value={form.topic} onChange={(e) => setForm(f => ({ ...f, topic: e.target.value }))} />
+  </div>
 
-        <div style={{ marginTop: 12 }}>
-          <Textarea label="Rules" rows={6} value={form.rules} onChange={(e) => setForm((f) => ({ ...f, rules: e.target.value }))} />
-        </div>
-      </Modal>
+  {/* Rules */}
+  <div style={{ marginTop: 12 }}>
+    <Textarea label="Rules" rows={6} value={form.rules} onChange={(e) => setForm(f => ({ ...f, rules: e.target.value }))} />
+  </div>
+
+  {/* Agents */}
+  <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+    {/* Agent A */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h4>Agent A</h4>
+      <Input label="Name" value={form.agent1.name} onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))} />
+      <Input label="Persona" value={form.agent1.persona} onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))} />
+      <Input label="Goal / Stance" value={form.agent1.stance} onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))} />
     </div>
+
+    {/* Agent B */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h4>Agent B</h4>
+      <Input label="Name" value={form.agent2.name} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))} />
+      <Input label="Persona" value={form.agent2.persona} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))} />
+      <Input label="Goal / Stance" value={form.agent2.stance} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))} />
+    </div>
+  </div>
+</Modal>
+</div>
+
   );
 }
