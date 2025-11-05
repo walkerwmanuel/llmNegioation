@@ -2,7 +2,10 @@
 
 This README provides setup and run instructions for **Project 38**, including how to install the required Python packages and start the frontend/backend server. It serves as a quick-start guide to help you configure the environment, install dependencies, and run the negotiation platform locally for development or testing.
 
+## For Direct Web Access try the link as follows: 
+https://llm-negioation-oijz.vercel.app/
 
+## For User Hosted Session Follow Instructions Below
 ## Installing Packages
 
 Before installing packages, make sure [Python 3](https://www.python.org/downloads/) is installed. This will ensure that Python-based packages can install and execute properly. Verify that Python is installed by running the following command in your terminal: 
