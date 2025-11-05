@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/CardB
 import ChatBubble from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
+import DownloadChatButton from "../components/ui/DownloadChatButton";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -368,6 +369,7 @@ export default function TextToText() {
             <Button onClick={onStart} disabled={loading || paused}>{loading && !paused ? "Running…" : "Start"}</Button>
             <Button variant="outline" onClick={onPause} disabled={!loading || paused}>Pause</Button>
             <Button onClick={onResume} disabled={!paused}>Resume</Button>
+            <DownloadChatButton targetId="chat-container" filename="negotiation_transcript.pdf" />
           </div>
         </CardHeader>
 
@@ -379,6 +381,7 @@ export default function TextToText() {
           )}
 
           <div
+          
             ref={chatRef}
             onScroll={onScroll}
             style={{
