@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/CardB
 import ChatBubble from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
-import DownloadChatButton from "../components/ui/DownloadChatButton";
+// import DownloadChatButton from "../components/ui/DownloadChatButton";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -178,7 +178,7 @@ export default function TextToText() {
         return;
       }
       //Enter = start run
-      if(event.code === "Enter"){
+      if((event.ctrlKey || event.metaKey) && event.code === "Enter"){
         event.preventDefault();
         if(!loading && !paused) onStart();
         return;
@@ -190,12 +190,12 @@ export default function TextToText() {
         else if(paused) onResume();
       }
       // 's' = open settings
-      else if(event.key.toLowerCase() === 's'){
+      else if((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's'){
         event.preventDefault();
         setOpenSettings(true);
       }
       // 'e' = edit last response
-      else if(event.key.toLowerCase() === 'e'){
+      else if((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'e'){
         event.preventDefault();
         const lastIndex = messages.length - 1;
         if(lastIndex >= 0){
@@ -355,10 +355,10 @@ export default function TextToText() {
             color: colors.muted,
           }}
         >
-          <span><b>Enter / Return</b> = Start / Restart Negotiation Run </span>   
+          <span><b>Control / Command + Enter / Return</b> = Start / Restart Negotiation Run </span>   
           <span><b>Space</b> = Pause / Resume </span>    
-          <span><b>'S'</b> = Open Settings </span>  
-          <span><b>'E'</b> = Edit Last Response </span>   
+          <span><b>Control + 'S'</b> = Open Settings </span>  
+          <span><b>Control + 'E'</b> = Edit Last Response </span>   
         </div>
       )}
 
@@ -369,7 +369,7 @@ export default function TextToText() {
             <Button onClick={onStart} disabled={loading || paused}>{loading && !paused ? "Running…" : "Start"}</Button>
             <Button variant="outline" onClick={onPause} disabled={!loading || paused}>Pause</Button>
             <Button onClick={onResume} disabled={!paused}>Resume</Button>
-            <DownloadChatButton targetId="chat-container" filename="negotiation_transcript.pdf" />
+            {/* <DownloadChatButton targetId="chat-container" filename="negotiation_transcript.pdf" /> */}
           </div>
         </CardHeader>
 
