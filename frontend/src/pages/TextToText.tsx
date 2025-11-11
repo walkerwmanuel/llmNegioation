@@ -505,14 +505,25 @@ export default function TextToText() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <h4>Agent A</h4>
             <Input label="Name" value={form.agent1.name} onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))} />
-            <Input label="Persona" value={form.agent1.persona} onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))} />
+            <Textarea
+              label="Persona"
+              rows={5}
+              value={form.agent1.persona}
+              onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))}
+            />
             <Input label="Goal / Stance" value={form.agent1.stance} onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))} />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <h4>Agent B</h4>
             <Input label="Name" value={form.agent2.name} onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))} />
-            <Input label="Persona" value={form.agent2.persona} onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))} />
+            <Textarea
+              label="Persona"
+              rows={5}
+              value={form.agent2.persona}
+              onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
+            />
+
             <Input label="Goal / Stance" value={form.agent2.stance} onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))} />
           </div>
         </div>
