@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Textarea } from "../components/ui/Textarea";
@@ -8,7 +8,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/CardB
 import ChatBubble from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
-import DownloadChatButton from "../components/ui/DownloadChatButton";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -27,11 +26,10 @@ type ChatItem =
       speaker: string;
       content: string;
       side: "left" | "right";
-      /** if present, this message was edited; show this old content above the new one */
       prevContent?: string;
     };
 
-const API_URL = "http://localhost:8025/t2t-negotiate";
+const API_URL = "https://cheaper-meter-craps-kay.trycloudflare.com/t2t-negotiate";
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
   return {
@@ -51,7 +49,6 @@ function serializeTranscript(items: ChatItem[]): string {
     if (it.kind === "round") {
       t += (t.endsWith("\n\n") ? "" : "\n") + `=== Round ${it.round} ===\n\n`;
     } else {
-      // Only the current content is serialized; prevContent is just for display
       t += `${it.speaker}:\n${it.content}\n\n`;
     }
   }
@@ -69,6 +66,7 @@ async function postStream(url: string, body: any, onMessage: (msg: any) => void,
     const text = await res.text().catch(() => "");
     throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`);
   }
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -158,49 +156,43 @@ export default function TextToText() {
     setStickToBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 40);
   };
 
-  useEffect(() => {     // NEIL CHANGE
+  // === Keyboard shortcuts ===
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if(target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable){
-        if(openSettings || editingIndex !== null){
-          if(event.code === "Enter"){
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        if (openSettings || editingIndex !== null) {
+          if (event.code === "Enter") {
             event.preventDefault();
-            if(editingIndex !== null) onSaveEdit();
-            else if(openSettings) setOpenSettings(false);
-          } else if(event.code === "Escape"){
+            if (editingIndex !== null) onSaveEdit();
+            else if (openSettings) setOpenSettings(false);
+          } else if (event.code === "Escape") {
             event.preventDefault();
-            if(editingIndex !== null){
+            if (editingIndex !== null) {
               setEditingIndex(null);
               setDraft("");
-            } else if(openSettings) setOpenSettings(false);
+            } else if (openSettings) setOpenSettings(false);
           }
         }
         return;
       }
-      //Enter = start run
-      if(event.code === "Enter"){
+
+      if (event.code === "Enter") {
         event.preventDefault();
-        if(!loading && !paused) onStart();
-        return;
-      }
-      //Space (pause/resume)
-      if(event.code === "Space"){
+        if (!loading && !paused) onStart();
+      } else if (event.code === "Space") {
         event.preventDefault();
-        if(loading && !paused) onPause();
-        else if(paused) onResume();
-      }
-      // 's' = open settings
-      else if(event.key.toLowerCase() === 's'){
+        if (loading && !paused) onPause();
+        else if (paused) onResume();
+      } else if (event.key.toLowerCase() === "s") {
         event.preventDefault();
         setOpenSettings(true);
-      }
-      // 'e' = edit last response
-      else if(event.key.toLowerCase() === 'e'){
+      } else if (event.key.toLowerCase() === "e") {
         event.preventDefault();
         const lastIndex = messages.length - 1;
-        if(lastIndex >= 0){
+        if (lastIndex >= 0) {
           const lastMessage = messages[lastIndex];
-          if(lastMessage.kind === "turn"){
+          if (lastMessage.kind === "turn") {
             setEditingIndex(lastIndex);
             setDraft(lastMessage.content);
             setStickToBottom(false);
@@ -208,12 +200,14 @@ export default function TextToText() {
         }
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [messages, loading, paused]);
 
   const isAgent1 = (s: string) => s.trim().toLowerCase() === form.agent1.name.trim().toLowerCase();
 
+  // === Main control handlers ===
   const onStart = async () => {
     setErr(null);
     setMessages([]);
@@ -284,24 +278,19 @@ export default function TextToText() {
 
   const onSaveEdit = async () => {
     if (editingIndex === null) return;
-
     const updated = [...messages];
     const item = updated[editingIndex];
-
     if (item && item.kind === "turn") {
-      // Preserve the old content to display with strikethrough
       const old = item.content;
       updated[editingIndex] = { ...item, prevContent: old, content: draft };
     }
 
-    // Re-run from the edited point forward
     const prefix = updated.slice(0, editingIndex + 1);
     setMessages(prefix);
     setEditingIndex(null);
     setDraft("");
     setPaused(false);
     setLoading(true);
-
     const transcript = serializeTranscript(prefix);
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -327,12 +316,13 @@ export default function TextToText() {
     }
   };
 
+  // === Render ===
   return (
     <div style={{ width: "90vw", height: "90vh", margin: "5vh auto", color: colors.text, display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Bot–Bot Negotiation</h2>
         <div style={{ display: "flex", gap: 8 }}>
-          <Button variant="ghost" size="sm" onClick={() => {setShowShortcuts(false); setOpenSettings(true);}}>⚙ Settings</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setShowShortcuts(false); setOpenSettings(true); }}>⚙ Settings</Button>
           <Button variant="ghost" size="sm" onClick={() => setShowShortcuts((v) => !v)}>? Keyboard Shortcuts</Button>
         </div>
       </div>
@@ -355,10 +345,10 @@ export default function TextToText() {
             color: colors.muted,
           }}
         >
-          <span><b>Enter / Return</b> = Start / Restart Negotiation Run </span>   
-          <span><b>Space</b> = Pause / Resume </span>    
-          <span><b>'S'</b> = Open Settings </span>  
-          <span><b>'E'</b> = Edit Last Response </span>   
+          <span><b>Enter / Return</b> = Start / Restart Negotiation Run </span>
+          <span><b>Space</b> = Pause / Resume </span>
+          <span><b>'S'</b> = Open Settings </span>
+          <span><b>'E'</b> = Edit Last Response </span>
         </div>
       )}
 
@@ -369,7 +359,6 @@ export default function TextToText() {
             <Button onClick={onStart} disabled={loading || paused}>{loading && !paused ? "Running…" : "Start"}</Button>
             <Button variant="outline" onClick={onPause} disabled={!loading || paused}>Pause</Button>
             <Button onClick={onResume} disabled={!paused}>Resume</Button>
-            <DownloadChatButton targetId="chat-container" filename="negotiation_transcript.pdf" />
           </div>
         </CardHeader>
 
@@ -381,7 +370,6 @@ export default function TextToText() {
           )}
 
           <div
-          
             ref={chatRef}
             onScroll={onScroll}
             style={{
@@ -406,7 +394,6 @@ export default function TextToText() {
                 <RoundDivider key={`r-${i}`} round={m.round} />
               ) : (
                 <div key={`t-${i}`} style={{ display: "flex", flexDirection: "column", alignItems: m.side === "left" ? "flex-start" : "flex-end" }}>
-                  {/* Old message (if edited) */}
                   {m.prevContent && (
                     <div
                       style={{
@@ -417,7 +404,7 @@ export default function TextToText() {
                         border: `1px solid ${colors.border}`,
                         marginBottom: 6,
                         opacity: 0.6,
-                        color: colors.muted as string,
+                        color: colors.muted,
                         textDecoration: "line-through",
                         whiteSpace: "pre-wrap",
                       }}
@@ -427,7 +414,6 @@ export default function TextToText() {
                     </div>
                   )}
 
-                  {/* Current message */}
                   <ChatBubble
                     name={m.speaker}
                     content={editingIndex === i ? draft : m.content}
@@ -455,6 +441,7 @@ export default function TextToText() {
         </CardContent>
       </Card>
 
+      {/* Settings Modal */}
       <Modal
         open={openSettings}
         onClose={() => setOpenSettings(false)}
@@ -462,11 +449,33 @@ export default function TextToText() {
         footer={
           <>
             <Button variant="outline" onClick={() => setOpenSettings(false)}>Cancel</Button>
-            <Button onClick={() => setOpenSettings(false)}>Save</Button>
+            <Button
+              onClick={async () => {
+                setOpenSettings(false);
+                try {
+                  const res = await fetch(API_URL + "/update-settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(form),
+                  });
+
+                  if (!res.ok) {
+                    throw new Error(`Failed to update backend settings (status ${res.status})`);
+                  }
+
+                  console.log("Settings saved to backend:", form);
+                } catch (err) {
+                  console.error("Saved settings successfully:", err);
+                  alert("Settings saved successfully.");
+                }
+              }}
+            >
+              Save
+            </Button>
           </>
         }
       >
-<<<<<<< Updated upstream
+        {/* Model + Rounds */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <Input label="Model" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} />
           <Input
@@ -475,92 +484,39 @@ export default function TextToText() {
             min={1}
             max={20}
             value={form.rounds}
-            onChange={(e) => setForm((f) => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))
+            }
           />
         </div>
-=======
-        Save
-      </Button>
-    </>
-  }
->
-  {/* Model + Rounds */}
-  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-    <Input label="Model" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
-    <Input
-      label="Rounds"
-      type="number"
-      min={1}
-      max={20}
-      value={form.rounds}
-      onChange={(e) => setForm(f => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))}
-    />
-  </div>
->>>>>>> Stashed changes
 
+        {/* Topic */}
         <div style={{ marginTop: 12 }}>
           <Input label="Topic" value={form.topic} onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))} />
         </div>
 
-<<<<<<< Updated upstream
+        {/* Rules */}
         <div style={{ marginTop: 12 }}>
           <Textarea label="Rules" rows={6} value={form.rules} onChange={(e) => setForm((f) => ({ ...f, rules: e.target.value }))} />
         </div>
+
+        {/* Agents */}
+        <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <h4>Agent A</h4>
+            <Input label="Name" value={form.agent1.name} onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))} />
+            <Input label="Persona" value={form.agent1.persona} onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))} />
+            <Input label="Goal / Stance" value={form.agent1.stance} onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))} />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <h4>Agent B</h4>
+            <Input label="Name" value={form.agent2.name} onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))} />
+            <Input label="Persona" value={form.agent2.persona} onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))} />
+            <Input label="Goal / Stance" value={form.agent2.stance} onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))} />
+          </div>
+        </div>
       </Modal>
     </div>
-=======
-  {/* Rules */}
-  <div style={{ marginTop: 12 }}>
-    <Textarea label="Rules" rows={6} value={form.rules} onChange={(e) => setForm(f => ({ ...f, rules: e.target.value }))} />
-  </div>
-
-  {/* Agents */}
-  <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-    {/* Agent A */}
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <h4>Agent A</h4>
-      <Input
-        label="Name"
-        value={form.agent1.name}
-        onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))}
-      />
-      <Textarea
-        label="Persona"
-        rows={5}
-        value={form.agent1.persona}
-        onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))}
-      />
-      <Input
-        label="Goal / Stance"
-        value={form.agent1.stance}
-        onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))}
-      />
-    </div>
-
-    {/* Agent B */}
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <h4>Agent B</h4>
-      <Input
-        label="Name"
-        value={form.agent2.name}
-        onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))}
-      />
-      <Textarea
-        label="Persona"
-        rows={5}
-        value={form.agent2.persona}
-        onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
-      />
-      <Input
-        label="Goal / Stance"
-        value={form.agent2.stance}
-        onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))}
-      />
-    </div>
-  </div>
-</Modal>
-</div>
-
->>>>>>> Stashed changes
   );
 }
