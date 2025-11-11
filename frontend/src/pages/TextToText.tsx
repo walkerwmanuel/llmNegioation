@@ -466,6 +466,7 @@ export default function TextToText() {
           </>
         }
       >
+<<<<<<< Updated upstream
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <Input label="Model" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} />
           <Input
@@ -477,15 +478,89 @@ export default function TextToText() {
             onChange={(e) => setForm((f) => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))}
           />
         </div>
+=======
+        Save
+      </Button>
+    </>
+  }
+>
+  {/* Model + Rounds */}
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+    <Input label="Model" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
+    <Input
+      label="Rounds"
+      type="number"
+      min={1}
+      max={20}
+      value={form.rounds}
+      onChange={(e) => setForm(f => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))}
+    />
+  </div>
+>>>>>>> Stashed changes
 
         <div style={{ marginTop: 12 }}>
           <Input label="Topic" value={form.topic} onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))} />
         </div>
 
+<<<<<<< Updated upstream
         <div style={{ marginTop: 12 }}>
           <Textarea label="Rules" rows={6} value={form.rules} onChange={(e) => setForm((f) => ({ ...f, rules: e.target.value }))} />
         </div>
       </Modal>
     </div>
+=======
+  {/* Rules */}
+  <div style={{ marginTop: 12 }}>
+    <Textarea label="Rules" rows={6} value={form.rules} onChange={(e) => setForm(f => ({ ...f, rules: e.target.value }))} />
+  </div>
+
+  {/* Agents */}
+  <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+    {/* Agent A */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h4>Agent A</h4>
+      <Input
+        label="Name"
+        value={form.agent1.name}
+        onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))}
+      />
+      <Textarea
+        label="Persona"
+        rows={5}
+        value={form.agent1.persona}
+        onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))}
+      />
+      <Input
+        label="Goal / Stance"
+        value={form.agent1.stance}
+        onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))}
+      />
+    </div>
+
+    {/* Agent B */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h4>Agent B</h4>
+      <Input
+        label="Name"
+        value={form.agent2.name}
+        onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))}
+      />
+      <Textarea
+        label="Persona"
+        rows={5}
+        value={form.agent2.persona}
+        onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
+      />
+      <Input
+        label="Goal / Stance"
+        value={form.agent2.stance}
+        onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))}
+      />
+    </div>
+  </div>
+</Modal>
+</div>
+
+>>>>>>> Stashed changes
   );
 }
