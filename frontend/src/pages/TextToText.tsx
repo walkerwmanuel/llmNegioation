@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/CardB
 import ChatBubble from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
+// import DownloadChatButton from "../components/ui/DownloadChatButton";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -111,19 +112,19 @@ export default function TextToText() {
   const defaults: FormState = useMemo(
     () => ({
       model: "gpt-4o-mini",
-      topic: "Is senior design for electrical and computer engineers actually useful?",
+      topic: "Should cell phones be allowed in high school and/or middle school classrooms?",
       rules:
-        "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn.\n2) Address the topic directly; cite concrete practices, examples, or trade-offs.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) If referencing evidence, summarize briefly rather than citing sources.",
+        "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn after your introduction.\n2) Address the topic directly; cite concrete practices, examples, or trade-offs.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) If referencing evidence, summarize briefly rather than citing sources.",
       rounds: 4,
       agent1: {
-        name: "Agent A",
-        persona: "You are Neil Sood, a reflective NC State undergrad.",
-        stance: "Senior design is useful for teamwork and integration.",
+        name: "Dr. Emily Carter",
+        persona: "You are Dr. Emily Carter, a 45-year-old Caucasian female social scientist with a Ph.D. in Health Communication and over 20 years of experience in qualitative research. You are known for your meticulous approach to analysis, focusing on precision and consistency. As you analyze the data, ensure that each element is carefully examined and categorized. Pay close attention to the details, and make decisions based on thorough reasoning. Your goal is to provide a well-structured and accurate analysis that reflects your commitment to precision and your extensive experience in the field.",
+        stance: "Cell phones should be allowed in classrooms.",
       },
       agent2: {
-        name: "Agent B",
-        persona: "You are Kaden Nelson, pragmatic and resume-focused.",
-        stance: "Internships provide more value than classroom projects.",
+        name: "Dr. Michael Rodriguez",
+        persona: "You are Dr. Michael Rodriguez, a 38-year-old Hispanic male social scientist with a Ph.D. in Sociology and 15 years of experience in analyzing social dynamics and health narratives. You are known for your intuitive and empathetic approach to research, focusing on the emotional tone and social context. As you analyze the data, consider the broader implications and the underlying human experiences. Your goal is to capture the nuances and emotional depth of the data, reflecting your understanding of the social dynamics and your commitment to empathy and insight.",
+        stance: "Cell phones should not be allowed in classrooms.",
       },
     }),
     []
@@ -246,18 +247,22 @@ export default function TextToText() {
         }
         return;
       }
-
-      if (event.code === "Enter") {
+      //Enter = start run
+      if((event.ctrlKey || event.metaKey) && event.code === "Enter"){
         event.preventDefault();
         if (!loading && !paused) onStart();
       } else if (event.code === "Space") {
         event.preventDefault();
-        if (loading && !paused) onPause();
-        else if (paused) onResume();
-      } else if (event.key.toLowerCase() === "s") {
+        if(loading && !paused) onPause();
+        else if(paused) onResume();
+      }
+      // 's' = open settings
+      else if((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's'){
         event.preventDefault();
         setOpenSettings(true);
-      } else if (event.key.toLowerCase() === "e") {
+      }
+      // 'e' = edit last response
+      else if((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'e'){
         event.preventDefault();
         const lastIndex = messages.length - 1;
         if (lastIndex >= 0) {
@@ -446,10 +451,10 @@ export default function TextToText() {
             color: colors.muted,
           }}
         >
-          <span><b>Enter / Return</b> = Start / Restart Negotiation Run </span>
-          <span><b>Space</b> = Pause / Resume </span>
-          <span><b>'S'</b> = Open Settings </span>
-          <span><b>'E'</b> = Edit Last Response </span>
+          <span><b>Control / Command + Enter / Return</b> = Start / Restart Negotiation Run </span>   
+          <span><b>Space</b> = Pause / Resume </span>    
+          <span><b>Control + 'S'</b> = Open Settings </span>  
+          <span><b>Control + 'E'</b> = Edit Last Response </span>   
         </div>
       )}
 
@@ -460,6 +465,7 @@ export default function TextToText() {
             <Button onClick={onStart} disabled={loading || paused}>{loading && !paused ? "Running…" : "Start"}</Button>
             <Button variant="outline" onClick={onPause} disabled={!loading || paused}>Pause</Button>
             <Button onClick={onResume} disabled={!paused}>Resume</Button>
+            {/* <DownloadChatButton targetId="chat-container" filename="negotiation_transcript.pdf" /> */}
           </div>
         </CardHeader>
 
@@ -561,118 +567,81 @@ export default function TextToText() {
 
       {/* Settings Modal */}
       <Modal
-        open={openSettings}
-        onClose={() => setOpenSettings(false)}
-        title="Negotiation Settings"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setOpenSettings(false)}>Cancel</Button>
-            <Button
-              onClick={async () => {
-                setOpenSettings(false);
-                try {
-                  const res = await fetch(API_URL + "/update-settings", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(form),
-                  });
+  open={openSettings}
+  onClose={() => setOpenSettings(false)}
+  title="Negotiation Settings"
+  footer={
+    <>
+      <Button variant="outline" onClick={() => setOpenSettings(false)}>Cancel</Button>
+      <Button
+        onClick={async () => {
+          setOpenSettings(false);
+          try {
+            const res = await fetch(API_URL + "/update-settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(form),
+            });
 
-                  if (!res.ok) {
-                    throw new Error(`Failed to update backend settings (status ${res.status})`);
-                  }
+            if (!res.ok) {
+              throw new Error(`Failed to update backend settings (status ${res.status})`);
+            }
 
-                  console.log("Settings saved to backend:", form);
-                } catch (err) {
-                  console.error("Saved settings successfully:", err);
-                  alert("Settings saved successfully.");
-                }
-              }}
-            >
-              Save
-            </Button>
-          </>
-        }
+            console.log("Settings saved to backend:", form);
+          } catch (err) {
+            console.error("Saved settings successfully:", err);
+            alert("Settings saved successfully.");
+          }
+        }}
       >
-{/* Model + Rounds */}
-<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-  {/* Model dropdown */}
-  <div style={{ display: "flex", flexDirection: "column" }}>
-    <label style={{ fontSize: 14, marginBottom: 4, color: colors.muted }}>Model</label>
-    <select
-      value={form.model}
-      onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-      style={{
-        padding: "8px 10px",
-        borderRadius: 6,
-        border: `1px solid ${colors.border}`,
-        background: colors.panelAlt,
-        color: colors.text,
-        fontSize: 14,
-        outline: "none",
-      }}
-    >
-      <option value="gpt-5">gpt-5</option>
-      <option value="gpt-5-mini">gpt-5-mini</option>
-      <option value="gpt-5-nano">gpt-5-nano</option>
-      <option value="gpt-4o">gpt-4o</option>
-      <option value="gpt-4o-mini">gpt-4o-mini</option>
-    </select>
+        Save
+      </Button>
+    </>
+  }
+>
+  {/* Model + Rounds */}
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+    <Input label="Model" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
+    <Input
+      label="Rounds"
+      type="number"
+      min={1}
+      max={20}
+      value={form.rounds}
+      onChange={(e) => setForm(f => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))}
+    />
+  </div> 
+
+  {/* Topic */}
+  <div style={{ marginTop: 12 }}>
+    <Input label="Topic" value={form.topic} onChange={(e) => setForm(f => ({ ...f, topic: e.target.value }))} />
   </div>
 
-  {/* Rounds */}
-  <Input
-    label="Rounds"
-    type="number"
-    min={1}
-    max={20}
-    value={form.rounds}
-    onChange={(e) =>
-      setForm((f) => ({
-        ...f,
-        rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)),
-      }))
-    }
-  />
+  {/* Rules */}
+  <div style={{ marginTop: 12 }}>
+    <Textarea label="Rules" rows={6} value={form.rules} onChange={(e) => setForm(f => ({ ...f, rules: e.target.value }))} />
+  </div>
+
+  {/* Agents */}
+  <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+    {/* Agent A */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h4>Agent A</h4>
+      <Input label="Name" value={form.agent1.name} onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))} />
+      <Textarea label="Persona" rows={5} value={form.agent1.persona} onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))} />
+      <Textarea label="Goal / Stance" rows={5} value={form.agent1.stance} onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))} />
+    </div>
+
+    {/* Agent B */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h4>Agent B</h4>
+      <Input label="Name" value={form.agent2.name} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))} />
+      <Textarea label="Persona" rows={5} value={form.agent2.persona} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))} />
+      <Textarea label="Goal / Stance" rows={2} value={form.agent2.stance} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))} />
+    </div>
+  </div>
+</Modal>
 </div>
 
-        {/* Topic */}
-        <div style={{ marginTop: 12 }}>
-          <Input label="Topic" value={form.topic} onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))} />
-        </div>
-
-        {/* Rules */}
-        <div style={{ marginTop: 12 }}>
-          <Textarea label="Rules" rows={6} value={form.rules} onChange={(e) => setForm((f) => ({ ...f, rules: e.target.value }))} />
-        </div>
-
-        {/* Agents */}
-        <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <h4>Agent A</h4>
-            <Input label="Name" value={form.agent1.name} onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))} />
-            <Textarea
-              label="Persona"
-              rows={5}
-              value={form.agent1.persona}
-              onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))}
-            />
-            <Input label="Goal / Stance" value={form.agent1.stance} onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))} />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <h4>Agent B</h4>
-            <Input label="Name" value={form.agent2.name} onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))} />
-            <Textarea
-              label="Persona"
-              rows={5}
-              value={form.agent2.persona}
-              onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
-            />
-
-            <Input label="Goal / Stance" value={form.agent2.stance} onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))} />
-          </div>
-        </div>
-      </Modal>
-    </div>
   );
 }

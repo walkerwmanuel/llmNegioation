@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.negotiate import router as negotiate_router
+from routes.speechtotext import router as speech_router
 
 app = FastAPI()
 
@@ -20,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(negotiate_router)
+app.include_router(speech_router)
 
 @app.get("/")
 def root():
