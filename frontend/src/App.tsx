@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import Home from "./pages/Home";
+import Home from "./pages/home";
 import TextToText from "./pages/TextToText";
+import SpeechToText from "./pages/SpeechToText";
 
 export default function App() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/text-to-text" element={<TextToText />} />
+        <Route path="/speech-to-text" element={<SpeechToText />} />
       </Routes>
     </Router>
   );

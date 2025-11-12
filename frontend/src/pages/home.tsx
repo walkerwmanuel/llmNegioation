@@ -61,7 +61,7 @@ export default function Home() {
         <div className="steps">
           <div className="step-box">
             <div className="badge-num">1</div>
-            <div className="step-title">Bot-Bot Negotiation (Text vs. Text)</div>
+            <Link to="/text-to-text" className="step-title">Bot-Bot Negotiation (Text vs. Text)</Link>
             <p className="muted">
               Two LLM agents with distinct cultural profiles negotiate simulated scenarios
               (e.g., salary/benefits, school cellphone policy). The GUI visualizes rounds,
@@ -71,7 +71,7 @@ export default function Home() {
 
           <div className="step-box">
             <div className="badge-num">2</div>
-            <div className="step-title">Human–Bot (Voice vs. Text)</div>
+            <Link to="/speech-to-text" className="step-title">Human–Bot (Voice vs. Text)</Link>
             <p className="muted">
               Adapt one agent to allow human participation via text with optional voice input
               (speech-to-text). Compare outcomes vs. bot–bot and iterate for research goals.
