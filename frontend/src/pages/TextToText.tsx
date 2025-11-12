@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Textarea } from "../components/ui/Textarea";
@@ -27,11 +27,10 @@ type ChatItem =
       speaker: string;
       content: string;
       side: "left" | "right";
-      /** if present, this message was edited; show this old content above the new one */
       prevContent?: string;
     };
 
-const API_URL = "http://localhost:8025/t2t-negotiate";
+const API_URL = "https://cheaper-meter-craps-kay.trycloudflare.com/t2t-negotiate";
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
   return {
@@ -51,7 +50,6 @@ function serializeTranscript(items: ChatItem[]): string {
     if (it.kind === "round") {
       t += (t.endsWith("\n\n") ? "" : "\n") + `=== Round ${it.round} ===\n\n`;
     } else {
-      // Only the current content is serialized; prevContent is just for display
       t += `${it.speaker}:\n${it.content}\n\n`;
     }
   }
@@ -69,6 +67,7 @@ async function postStream(url: string, body: any, onMessage: (msg: any) => void,
     const text = await res.text().catch(() => "");
     throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`);
   }
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -140,9 +139,79 @@ export default function TextToText() {
   const [err, setErr] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const [winner, setWinner] = useState<string | null>(null);
   const chatRef = useRef<HTMLDivElement | null>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
   const controllerRef = useRef<AbortController | null>(null);
+  
+  function evaluateWinner() {
+    let roundsWonA = 0;
+    let roundsWonB = 0;
+  
+    const clarityKeywords = /\b(because|therefore|clearly|evidence|agree|disagree|however|whereas|thus|should|must)\b/gi;
+    const confidenceKeywords = /\b(always|definitely|strongly|believe|recommend|prove|show|demonstrate)\b/gi;
+  
+    // --- Group messages by round ---
+    const rounds: Record<number, ChatItem[]> = {};
+    let currentRound = 0;
+  
+    for (const m of messages) {
+      if (m.kind === "round") {
+        currentRound = m.round;
+        rounds[currentRound] = [];
+      } else if (m.kind === "turn") {
+        // if no "round" yet, default to round 1
+        if (currentRound === 0) currentRound = 1;
+        if (!rounds[currentRound]) rounds[currentRound] = [];
+        rounds[currentRound].push(m);
+      }
+    }
+  
+    // --- Score each round ---
+    for (const r of Object.keys(rounds)) {
+      const turns = rounds[Number(r)];
+      let scoreA = 0;
+      let scoreB = 0;
+  
+      for (const m of turns) {
+        if (m.kind !== "turn") continue;
+        const wordCount = m.content.split(/\s+/).length;
+  
+        // Conciseness weighting
+        let concisenessScore = 0;
+        if (wordCount >= 20 && wordCount <= 45) concisenessScore = 20;
+        else if (wordCount > 45) concisenessScore = 10;
+        else concisenessScore = 5;
+  
+        const clarityScore = (m.content.match(clarityKeywords) || []).length * 5;
+        const confidenceScore = (m.content.match(confidenceKeywords) || []).length * 8;
+        const total = concisenessScore + clarityScore + confidenceScore;
+  
+        if (isAgent1(m.speaker)) scoreA += total;
+        else scoreB += total;
+      }
+  
+      // --- Round decision ---
+      if (scoreA > scoreB) roundsWonA += 1;
+      else if (scoreB > scoreA) roundsWonB += 1;
+      else {
+        // Tie → half point each
+        roundsWonA += 0.5;
+        roundsWonB += 0.5;
+      }
+    }
+  
+    // --- Deterministic tie-breaker ---
+    let winnerName = "Tie";
+    if (roundsWonA > roundsWonB) winnerName = form.agent1.name;
+    else if (roundsWonB > roundsWonA) winnerName = form.agent2.name;
+    else {
+      // alphabetic deterministic tiebreak
+      winnerName = form.agent1.name < form.agent2.name ? form.agent1.name : form.agent2.name;
+    }
+  
+    setWinner(`Negotiation Winner: ${winnerName} (Rounds: ${roundsWonA} – ${roundsWonB})`);
+  }  
 
   useEffect(() => {
     if (!stickToBottom) return;
@@ -158,21 +227,22 @@ export default function TextToText() {
     setStickToBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 40);
   };
 
-  useEffect(() => {     // NEIL CHANGE
+  // === Keyboard shortcuts ===
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if(target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable){
-        if(openSettings || editingIndex !== null){
-          if(event.code === "Enter"){
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        if (openSettings || editingIndex !== null) {
+          if (event.code === "Enter") {
             event.preventDefault();
-            if(editingIndex !== null) onSaveEdit();
-            else if(openSettings) setOpenSettings(false);
-          } else if(event.code === "Escape"){
+            if (editingIndex !== null) onSaveEdit();
+            else if (openSettings) setOpenSettings(false);
+          } else if (event.code === "Escape") {
             event.preventDefault();
-            if(editingIndex !== null){
+            if (editingIndex !== null) {
               setEditingIndex(null);
               setDraft("");
-            } else if(openSettings) setOpenSettings(false);
+            } else if (openSettings) setOpenSettings(false);
           }
         }
         return;
@@ -180,11 +250,8 @@ export default function TextToText() {
       //Enter = start run
       if((event.ctrlKey || event.metaKey) && event.code === "Enter"){
         event.preventDefault();
-        if(!loading && !paused) onStart();
-        return;
-      }
-      //Space (pause/resume)
-      if(event.code === "Space"){
+        if (!loading && !paused) onStart();
+      } else if (event.code === "Space") {
         event.preventDefault();
         if(loading && !paused) onPause();
         else if(paused) onResume();
@@ -198,9 +265,9 @@ export default function TextToText() {
       else if((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'e'){
         event.preventDefault();
         const lastIndex = messages.length - 1;
-        if(lastIndex >= 0){
+        if (lastIndex >= 0) {
           const lastMessage = messages[lastIndex];
-          if(lastMessage.kind === "turn"){
+          if (lastMessage.kind === "turn") {
             setEditingIndex(lastIndex);
             setDraft(lastMessage.content);
             setStickToBottom(false);
@@ -208,14 +275,17 @@ export default function TextToText() {
         }
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [messages, loading, paused]);
 
   const isAgent1 = (s: string) => s.trim().toLowerCase() === form.agent1.name.trim().toLowerCase();
 
+  // === Main control handlers ===
   const onStart = async () => {
     setErr(null);
+    setWinner(null);
     setMessages([]);
     setEditingIndex(null);
     setDraft("");
@@ -229,7 +299,22 @@ export default function TextToText() {
         API_URL,
         buildPayload({ transcript: "", form }),
         (msg) => {
-          if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
+          if (msg.type === "round") {
+            setMessages((prev) => {
+              // Only add this round if it doesn't already exist
+              const alreadyExists = prev.some(
+                (m) => m.kind === "round" && m.round === msg.round
+              );
+              if (alreadyExists) return prev;
+              return [...prev, { kind: "round", round: msg.round }];
+            });
+          
+            // ✅ Check if final round reached
+            if (msg.round >= form.rounds) {
+              setTimeout(() => evaluateWinner(), 500);
+            }
+          }                   
+
           if (msg.type === "turn") {
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
@@ -266,7 +351,22 @@ export default function TextToText() {
         API_URL,
         buildPayload({ transcript, form }),
         (msg) => {
-          if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
+          if (msg.type === "round") {
+            setMessages((prev) => {
+              // Only add this round if it doesn't already exist
+              const alreadyExists = prev.some(
+                (m) => m.kind === "round" && m.round === msg.round
+              );
+              if (alreadyExists) return prev;
+              return [...prev, { kind: "round", round: msg.round }];
+            });
+          
+            // ✅ Check if final round reached
+            if (msg.round >= form.rounds) {
+              setTimeout(() => evaluateWinner(), 500);
+            }
+          }                   
+
           if (msg.type === "turn") {
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
@@ -284,24 +384,19 @@ export default function TextToText() {
 
   const onSaveEdit = async () => {
     if (editingIndex === null) return;
-
     const updated = [...messages];
     const item = updated[editingIndex];
-
     if (item && item.kind === "turn") {
-      // Preserve the old content to display with strikethrough
       const old = item.content;
       updated[editingIndex] = { ...item, prevContent: old, content: draft };
     }
 
-    // Re-run from the edited point forward
     const prefix = updated.slice(0, editingIndex + 1);
     setMessages(prefix);
     setEditingIndex(null);
     setDraft("");
     setPaused(false);
     setLoading(true);
-
     const transcript = serializeTranscript(prefix);
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -327,12 +422,13 @@ export default function TextToText() {
     }
   };
 
+  // === Render ===
   return (
     <div style={{ width: "90vw", height: "90vh", margin: "5vh auto", color: colors.text, display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Bot–Bot Negotiation</h2>
         <div style={{ display: "flex", gap: 8 }}>
-          <Button variant="ghost" size="sm" onClick={() => {setShowShortcuts(false); setOpenSettings(true);}}>⚙ Settings</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setShowShortcuts(false); setOpenSettings(true); }}>⚙ Settings</Button>
           <Button variant="ghost" size="sm" onClick={() => setShowShortcuts((v) => !v)}>? Keyboard Shortcuts</Button>
         </div>
       </div>
@@ -381,7 +477,6 @@ export default function TextToText() {
           )}
 
           <div
-          
             ref={chatRef}
             onScroll={onScroll}
             style={{
@@ -406,7 +501,6 @@ export default function TextToText() {
                 <RoundDivider key={`r-${i}`} round={m.round} />
               ) : (
                 <div key={`t-${i}`} style={{ display: "flex", flexDirection: "column", alignItems: m.side === "left" ? "flex-start" : "flex-end" }}>
-                  {/* Old message (if edited) */}
                   {m.prevContent && (
                     <div
                       style={{
@@ -417,7 +511,7 @@ export default function TextToText() {
                         border: `1px solid ${colors.border}`,
                         marginBottom: 6,
                         opacity: 0.6,
-                        color: colors.muted as string,
+                        color: colors.muted,
                         textDecoration: "line-through",
                         whiteSpace: "pre-wrap",
                       }}
@@ -427,7 +521,6 @@ export default function TextToText() {
                     </div>
                   )}
 
-                  {/* Current message */}
                   <ChatBubble
                     name={m.speaker}
                     content={editingIndex === i ? draft : m.content}
@@ -452,9 +545,27 @@ export default function TextToText() {
 
           {loading && <div style={{ marginTop: 8, fontSize: 12, color: colors.muted }}>{paused ? "Paused." : "Streaming transcript…"}</div>}
           {!loading && paused && <div style={{ marginTop: 8, fontSize: 12, color: colors.muted }}>Paused. Click Resume to continue.</div>}
+
+          {winner && (
+          <div
+          style={{
+          marginTop: 12,
+          padding: "10px 14px",
+          borderRadius: 8,
+          border: `1px solid ${colors.border}`,
+          background: colors.panelAlt,
+          textAlign: "center",
+          fontWeight: 600,
+          }}
+          >
+    Negotiation Winner: {winner}
+  </div>
+)}
+
         </CardContent>
       </Card>
 
+      {/* Settings Modal */}
       <Modal
   open={openSettings}
   onClose={() => setOpenSettings(false)}
