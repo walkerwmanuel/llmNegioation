@@ -138,9 +138,79 @@ export default function TextToText() {
   const [err, setErr] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const [winner, setWinner] = useState<string | null>(null);
   const chatRef = useRef<HTMLDivElement | null>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
   const controllerRef = useRef<AbortController | null>(null);
+  
+  function evaluateWinner() {
+    let roundsWonA = 0;
+    let roundsWonB = 0;
+  
+    const clarityKeywords = /\b(because|therefore|clearly|evidence|agree|disagree|however|whereas|thus|should|must)\b/gi;
+    const confidenceKeywords = /\b(always|definitely|strongly|believe|recommend|prove|show|demonstrate)\b/gi;
+  
+    // --- Group messages by round ---
+    const rounds: Record<number, ChatItem[]> = {};
+    let currentRound = 0;
+  
+    for (const m of messages) {
+      if (m.kind === "round") {
+        currentRound = m.round;
+        rounds[currentRound] = [];
+      } else if (m.kind === "turn") {
+        // if no "round" yet, default to round 1
+        if (currentRound === 0) currentRound = 1;
+        if (!rounds[currentRound]) rounds[currentRound] = [];
+        rounds[currentRound].push(m);
+      }
+    }
+  
+    // --- Score each round ---
+    for (const r of Object.keys(rounds)) {
+      const turns = rounds[Number(r)];
+      let scoreA = 0;
+      let scoreB = 0;
+  
+      for (const m of turns) {
+        if (m.kind !== "turn") continue;
+        const wordCount = m.content.split(/\s+/).length;
+  
+        // Conciseness weighting
+        let concisenessScore = 0;
+        if (wordCount >= 20 && wordCount <= 45) concisenessScore = 20;
+        else if (wordCount > 45) concisenessScore = 10;
+        else concisenessScore = 5;
+  
+        const clarityScore = (m.content.match(clarityKeywords) || []).length * 5;
+        const confidenceScore = (m.content.match(confidenceKeywords) || []).length * 8;
+        const total = concisenessScore + clarityScore + confidenceScore;
+  
+        if (isAgent1(m.speaker)) scoreA += total;
+        else scoreB += total;
+      }
+  
+      // --- Round decision ---
+      if (scoreA > scoreB) roundsWonA += 1;
+      else if (scoreB > scoreA) roundsWonB += 1;
+      else {
+        // Tie → half point each
+        roundsWonA += 0.5;
+        roundsWonB += 0.5;
+      }
+    }
+  
+    // --- Deterministic tie-breaker ---
+    let winnerName = "Tie";
+    if (roundsWonA > roundsWonB) winnerName = form.agent1.name;
+    else if (roundsWonB > roundsWonA) winnerName = form.agent2.name;
+    else {
+      // alphabetic deterministic tiebreak
+      winnerName = form.agent1.name < form.agent2.name ? form.agent1.name : form.agent2.name;
+    }
+  
+    setWinner(`Negotiation Winner: ${winnerName} (Rounds: ${roundsWonA} – ${roundsWonB})`);
+  }  
 
   useEffect(() => {
     if (!stickToBottom) return;
@@ -210,6 +280,7 @@ export default function TextToText() {
   // === Main control handlers ===
   const onStart = async () => {
     setErr(null);
+    setWinner(null);
     setMessages([]);
     setEditingIndex(null);
     setDraft("");
@@ -223,7 +294,22 @@ export default function TextToText() {
         API_URL,
         buildPayload({ transcript: "", form }),
         (msg) => {
-          if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
+          if (msg.type === "round") {
+            setMessages((prev) => {
+              // Only add this round if it doesn't already exist
+              const alreadyExists = prev.some(
+                (m) => m.kind === "round" && m.round === msg.round
+              );
+              if (alreadyExists) return prev;
+              return [...prev, { kind: "round", round: msg.round }];
+            });
+          
+            // ✅ Check if final round reached
+            if (msg.round >= form.rounds) {
+              setTimeout(() => evaluateWinner(), 500);
+            }
+          }                   
+
           if (msg.type === "turn") {
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
@@ -260,7 +346,22 @@ export default function TextToText() {
         API_URL,
         buildPayload({ transcript, form }),
         (msg) => {
-          if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
+          if (msg.type === "round") {
+            setMessages((prev) => {
+              // Only add this round if it doesn't already exist
+              const alreadyExists = prev.some(
+                (m) => m.kind === "round" && m.round === msg.round
+              );
+              if (alreadyExists) return prev;
+              return [...prev, { kind: "round", round: msg.round }];
+            });
+          
+            // ✅ Check if final round reached
+            if (msg.round >= form.rounds) {
+              setTimeout(() => evaluateWinner(), 500);
+            }
+          }                   
+
           if (msg.type === "turn") {
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
@@ -438,6 +539,23 @@ export default function TextToText() {
 
           {loading && <div style={{ marginTop: 8, fontSize: 12, color: colors.muted }}>{paused ? "Paused." : "Streaming transcript…"}</div>}
           {!loading && paused && <div style={{ marginTop: 8, fontSize: 12, color: colors.muted }}>Paused. Click Resume to continue.</div>}
+
+          {winner && (
+          <div
+          style={{
+          marginTop: 12,
+          padding: "10px 14px",
+          borderRadius: 8,
+          border: `1px solid ${colors.border}`,
+          background: colors.panelAlt,
+          textAlign: "center",
+          fontWeight: 600,
+          }}
+          >
+    Negotiation Winner: {winner}
+  </div>
+)}
+
         </CardContent>
       </Card>
 
@@ -475,20 +593,47 @@ export default function TextToText() {
           </>
         }
       >
-        {/* Model + Rounds */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <Input label="Model" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} />
-          <Input
-            label="Rounds"
-            type="number"
-            min={1}
-            max={20}
-            value={form.rounds}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))
-            }
-          />
-        </div>
+{/* Model + Rounds */}
+<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+  {/* Model dropdown */}
+  <div style={{ display: "flex", flexDirection: "column" }}>
+    <label style={{ fontSize: 14, marginBottom: 4, color: colors.muted }}>Model</label>
+    <select
+      value={form.model}
+      onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+      style={{
+        padding: "8px 10px",
+        borderRadius: 6,
+        border: `1px solid ${colors.border}`,
+        background: colors.panelAlt,
+        color: colors.text,
+        fontSize: 14,
+        outline: "none",
+      }}
+    >
+      <option value="gpt-5">gpt-5</option>
+      <option value="gpt-5-mini">gpt-5-mini</option>
+      <option value="gpt-5-nano">gpt-5-nano</option>
+      <option value="gpt-4o">gpt-4o</option>
+      <option value="gpt-4o-mini">gpt-4o-mini</option>
+    </select>
+  </div>
+
+  {/* Rounds */}
+  <Input
+    label="Rounds"
+    type="number"
+    min={1}
+    max={20}
+    value={form.rounds}
+    onChange={(e) =>
+      setForm((f) => ({
+        ...f,
+        rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)),
+      }))
+    }
+  />
+</div>
 
         {/* Topic */}
         <div style={{ marginTop: 12 }}>
