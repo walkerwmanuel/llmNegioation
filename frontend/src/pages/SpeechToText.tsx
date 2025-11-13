@@ -340,7 +340,7 @@ export default function SpeechToText() {
 
       <Card style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <CardHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <CardTitle>Conversation</CardTitle>
+          <CardTitle>Negotiation</CardTitle>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {recording && (
               <span style={{ fontSize: 14, color: colors.muted }}>
