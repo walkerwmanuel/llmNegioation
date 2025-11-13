@@ -33,7 +33,7 @@ export default function SpeechToText() {
       model: "gpt-4o-mini",
       topic: "Negotiation over the price of Emily's used car.",
       rules:
-        "NEGOTIATION RULES:\n1) Begin the negotiation by introducing yourself before you begin your dialogue.\n2) Respond in EXACTLY two sentences per turn after your introduction.\n3) Focus on concrete details like price, car condition, and the current limited supply of cars.\n4) No markdown, no emojis, no bullet points.\n5) Stay civil, concise, and on-topic; avoid generic platitudes.\n6) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.\n7) Both agents must reach an agreement on whether to buy the car and at what price by the final round; some compromise may be necessary.",
+        "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn after your introduction.\n2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.",
       rounds: 4,
       agent1: {
         name: "You",
