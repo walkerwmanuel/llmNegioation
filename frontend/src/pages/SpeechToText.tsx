@@ -31,23 +31,27 @@ export default function SpeechToText() {
   const defaults: FormState = useMemo(
     () => ({
       model: "gpt-4o-mini",
-      topic: "Is senior design for electrical and computer engineers actually useful?",
+      topic: "Negotiation over the price of Emily's used car.",
       rules:
-        "NEGOTIATION RULES:\n1) Begin the negotiation by introducing yourself before you begin your dialogue. \n2) Respond in EXACTLY two sentences per turn after your introduction.\n3) Address the topic directly; cite concrete practices, examples, or trade-offs.\n4) No markdown, no emojis, no bullet points.\n5) Stay civil, concise, and on-topic; avoid generic platitudes.\n6) If referencing evidence, summarize briefly rather than citing sources. \n7) Both agents must reach an agreement by the final round. As such it may be necessary for some level of compromise in each exchange.",
+        "NEGOTIATION RULES:\n1) Begin the negotiation by introducing yourself before you begin your dialogue.\n2) Respond in EXACTLY two sentences per turn after your introduction.\n3) Focus on concrete details like price, car condition, and the current limited supply of cars.\n4) No markdown, no emojis, no bullet points.\n5) Stay civil, concise, and on-topic; avoid generic platitudes.\n6) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.\n7) Both agents must reach an agreement on whether to buy the car and at what price by the final round; some compromise may be necessary.",
       rounds: 4,
       agent1: {
         name: "You",
-        persona: "You are speaking your own thoughts.",
-        stance: "Express your genuine opinion.",
+        persona:
+          "You are a cautious buyer with a limited budget who has researched similar cars and believes a fair price is closer to $12,000. You value fairness and want to push back against inflated prices while still being open to compromise.",
+        stance: "Negotiate to bring the price down to a fair market value, using your research as justification.",
       },
       agent2: {
-        name: "Dr. Emily Carter",
-        persona: "You are Dr. Emily Carter, a 45-year-old Caucasian female social scientist with a Ph.D. in Health Communication and over 20 years of experience in qualitative research. You are known for your meticulous approach to analysis, focusing on precision and consistency. As you analyze the data, ensure that each element is carefully examined and categorized. Pay close attention to the details, and make decisions based on thorough reasoning. Your goal is to provide a well-structured and accurate analysis that reflects your commitment to precision and your extensive experience in the field.",
-        stance: "Engage constructively with the human's perspective.",
+        name: "Emily",
+        persona:
+          "You are Emily, a car owner trying to sell your used car for $15,000. You know the car is probably worth less, but you want to take advantage of the current limited supply of cars by anchoring high and emphasizing scarcity, while still remaining honest about its condition.",
+        stance:
+          "Aim to keep the final price as close to $15,000 as possible by stressing the limited market and the car’s positives, but be prepared to compromise enough to close the deal.",
       },
     }),
     []
   );
+  
 
   const [form, setForm] = useState<FormState>(defaults);
   const [openSettings, setOpenSettings] = useState(false);
