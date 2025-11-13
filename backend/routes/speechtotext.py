@@ -26,23 +26,14 @@ class SpeechSettings(BaseModel):
 class TextPrompt(BaseModel):
     text: str
 
-current_settings = SpeechSettings(
-    model="gpt-4o-mini",
-    topic="Is senior design for electrical and computer engineers actually useful?",
-    rules="NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn.\n2) Address the topic directly; cite concrete practices, examples, or trade-offs.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) If referencing evidence, summarize briefly rather than citing sources.",
-    bot=BotConfig(
-        name="Bot",
-        personality="You are a thoughtful conversational partner.",
-        goal="Engage constructively with the human's perspective."
-    )
-)
+current_settings = None
 
 @router.post("/speech-to-text/update-settings")
 async def update_settings(settings: SpeechSettings):
-    """Update the bot configuration for speech-to-text conversations"""
     global current_settings
     current_settings = settings
-    return {"status": "success", "settings": settings}
+    return {"status": "success"}
+
 
 # 1) Transcription only
 @router.post("/speech-to-text/transcribe")

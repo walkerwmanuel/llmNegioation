@@ -52,6 +52,36 @@ export default function SpeechToText() {
     []
   );
   
+  // Send default settings to backend when page loads
+useEffect(() => {
+  async function syncDefaults() {
+    try {
+      const payload = {
+        model: form.model,
+        topic: form.topic,
+        rules: form.rules,
+        bot: {
+          name: form.agent2.name,
+          personality: form.agent2.persona,
+          goal: form.agent2.stance,
+        },
+      };
+
+      await fetch(SETTINGS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("Default settings synced to backend:", payload);
+    } catch (err) {
+      console.error("Failed to sync default settings:", err);
+    }
+  }
+
+  syncDefaults();
+}, []); // ⭐ runs ONCE on page load
+
 
   const [form, setForm] = useState<FormState>(defaults);
   const [openSettings, setOpenSettings] = useState(false);
