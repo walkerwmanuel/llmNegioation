@@ -23,6 +23,9 @@ class SpeechSettings(BaseModel):
     rules: str
     bot: BotConfig
 
+class TextPrompt(BaseModel):
+    text: str
+
 current_settings = SpeechSettings(
     model="gpt-4o-mini",
     topic="Is senior design for electrical and computer engineers actually useful?",
@@ -41,8 +44,9 @@ async def update_settings(settings: SpeechSettings):
     current_settings = settings
     return {"status": "success", "settings": settings}
 
-@router.post("/speech-to-text")
-async def speech_to_response(file: UploadFile = File(...)):
+# 1) Transcription only
+@router.post("/speech-to-text/transcribe")
+async def transcribe_audio(file: UploadFile = File(...)):
     try:
         file_extension = os.path.splitext(file.filename)[1] or ".webm"
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
@@ -50,6 +54,7 @@ async def speech_to_response(file: UploadFile = File(...)):
             tmp.write(content)
             tmp_path = tmp.name
 
+        # Whisper transcription
         with open(tmp_path, "rb") as f:
             transcript = client.audio.transcriptions.create(
                 model="whisper-1",
@@ -57,6 +62,26 @@ async def speech_to_response(file: UploadFile = File(...)):
             )
 
         user_text = transcript.text
+
+        # Clean up temp file
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
+
+        # 👉 ONLY return transcript here
+        return {"transcript": user_text}
+
+    except Exception as e:
+        print(f"Error in transcribe_audio: {str(e)}")
+        return {"error": str(e)}
+
+
+# 2) Take edited text and get bot reply
+@router.post("/speech-to-text/respond")
+async def respond_to_text(body: TextPrompt):
+    try:
+        user_text = body.text
 
         system_prompt = f"""You are {current_settings.bot.name}.
 
@@ -70,24 +95,18 @@ Topic of conversation: {current_settings.topic}
 
 Respond to the user's message following these guidelines."""
 
-        # Get bot response using configured settings
         completion = client.chat.completions.create(
             model=current_settings.model,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_text}
-            ]
+                {"role": "user", "content": user_text},
+            ],
         )
 
         bot_text = completion.choices[0].message.content
-        
-        # Clean up temp file
-        try:
-            os.unlink(tmp_path)
-        except:
-            pass
 
         return {"you": user_text, "bot": bot_text}
-    
+
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error in respond_to_text: {str(e)}")
+        return {"error": str(e)}

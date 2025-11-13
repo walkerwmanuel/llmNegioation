@@ -64,6 +64,9 @@ export default function SpeechToText() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [stickToBottom, setStickToBottom] = useState(true);
+  const [transcript, setTranscript] = useState("");
+  const [hasTranscript, setHasTranscript] = useState(false);
+
   
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -71,8 +74,10 @@ export default function SpeechToText() {
   const timerRef = useRef<number | null>(null);
   const maxTimeoutRef = useRef<number | null>(null);
 
-  const API_URL = "http://localhost:8025/speech-to-text";
+  const TRANSCRIBE_URL = "http://localhost:8025/speech-to-text/transcribe";
+  const RESPOND_URL = "http://localhost:8025/speech-to-text/respond";
   const SETTINGS_URL = "http://localhost:8025/speech-to-text/update-settings";
+
 
   // Auto-scroll chat
   useEffect(() => {
@@ -189,22 +194,26 @@ export default function SpeechToText() {
           const formData = new FormData();
           formData.append("file", file);
 
-          console.log("Sending to API...");
-          const res = await fetch(API_URL, { method: "POST", body: formData });
-          
+          console.log("Sending audio to transcription API...");
+
+          const res = await fetch(TRANSCRIBE_URL, { method: "POST", body: formData });
+
           if (!res.ok) {
             const errorText = await res.text();
             throw new Error(`HTTP ${res.status}: ${errorText}`);
           }
-          
-          const data = await res.json();
-          console.log("Response:", data);
 
-          setMessages((prev) => [
-            ...prev,
-            { speaker: "You", content: data.you, side: "left" },
-            { speaker: form.agent2.name, content: data.bot, side: "right" },
-          ]);
+          const data = await res.json();
+          console.log("Transcription response:", data);
+
+          if (!data.transcript) {
+            throw new Error("No transcript returned from server");
+          }
+
+          // Save transcript so user can edit it
+          setTranscript(data.transcript);
+          setHasTranscript(true);
+
         } catch (err: any) {
           console.error("Error processing recording:", err);
           setError(err.message);
@@ -269,6 +278,49 @@ export default function SpeechToText() {
     setEditingIndex(null);
     setDraft("");
   };
+
+  async function sendTranscriptToBot() {
+    try {
+      setError(null);
+
+      const cleaned = transcript.trim();
+      if (!cleaned) {
+        throw new Error("Transcript is empty. Please type something before sending.");
+      }
+
+      const res = await fetch(RESPOND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: cleaned }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
+      console.log("Respond response:", data);
+
+      if (!data.you || !data.bot) {
+        throw new Error("Unexpected response from server");
+      }
+
+      // Add to chat history
+      setMessages((prev) => [
+        ...prev,
+        { speaker: "You", content: data.you, side: "left" },
+        { speaker: form.agent2.name, content: data.bot, side: "right" },
+      ]);
+
+      // Clear the edit box
+      setTranscript("");
+      setHasTranscript(false);
+    } catch (err: any) {
+      console.error("Error sending transcript:", err);
+      setError(err.message || "Failed to send transcript to bot");
+    }
+  }
 
 
   return (
@@ -356,18 +408,31 @@ export default function SpeechToText() {
             )}
           </div>
         </CardHeader>
-
-        <CardContent style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <CardContent
+          style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
+        >
           {err && (
-            <div style={{ padding: 12, borderRadius: 8, border: "1px solid #7f1d1d", background: "#1f1111", color: "#fecaca", marginBottom: 12 }}>
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                border: "1px solid #7f1d1d",
+                background: "#1f1111",
+                color: "#fecaca",
+                marginBottom: 12,
+              }}
+            >
               {err}
             </div>
           )}
 
-          {messages.length === 0 && !recording && (
-            <div style={{ color: colors.muted, fontSize: 14 }}>Press 🎤 to record your voice.</div>
+          {messages.length === 0 && !recording && !hasTranscript && (
+            <div style={{ color: colors.muted, fontSize: 14 }}>
+              Press 🎤 to record your voice.
+            </div>
           )}
 
+          {/* Chat messages */}
           {messages.map((m, i) => (
             <div
               key={i}
@@ -418,7 +483,52 @@ export default function SpeechToText() {
               />
             </div>
           ))}
+
+          {/* ⭐ Transcript edit box at the bottom, before the NEXT turn ⭐ */}
+          {hasTranscript && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 8,
+                border: `1px solid ${colors.border}`,
+                background: colors.panelAlt,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 14, color: colors.muted, marginBottom: 4 }}>
+                Edit your transcript below, then press <b>Send to Bot</b>.
+              </div>
+
+              <Textarea
+                label="Transcript"
+                rows={4}
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+              />
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setHasTranscript(false);
+                    setTranscript("");
+                  }}
+                >
+                  Discard
+                </Button>
+
+                <Button size="sm" onClick={sendTranscriptToBot}>
+                  Send to Bot
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
+
       </Card>
 
       <Modal
