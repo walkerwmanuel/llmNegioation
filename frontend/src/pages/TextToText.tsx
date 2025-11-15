@@ -132,6 +132,7 @@ export default function TextToText() {
 
   const [form, setForm] = useState<FormState>(defaults);
   const [openSettings, setOpenSettings] = useState(false);
+  const [openScoringInfo, setOpenScoringInfo] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -148,9 +149,6 @@ export default function TextToText() {
     let roundsWonA = 0;
     let roundsWonB = 0;
   
-    const clarityKeywords = /\b(because|therefore|clearly|evidence|agree|disagree|however|whereas|thus|should|must)\b/gi;
-    const confidenceKeywords = /\b(always|definitely|strongly|believe|recommend|prove|show|demonstrate)\b/gi;
-  
     // --- Group messages by round ---
     const rounds: Record<number, ChatItem[]> = {};
     let currentRound = 0;
@@ -160,12 +158,24 @@ export default function TextToText() {
         currentRound = m.round;
         rounds[currentRound] = [];
       } else if (m.kind === "turn") {
-        // if no "round" yet, default to round 1
         if (currentRound === 0) currentRound = 1;
         if (!rounds[currentRound]) rounds[currentRound] = [];
         rounds[currentRound].push(m);
       }
     }
+  
+    // Helper: detect numbers (very common in negotiation offers)
+    const hasNumericOffer = (text: string) => /\b\d+(\.\d+)?\b/.test(text);
+  
+    // Helper: basic similarity check for “contradiction” detection
+    const contradiction = (oldText: string, newText: string) => {
+      return (
+        oldText.length > 0 &&
+        newText.length > 0 &&
+        oldText.toLowerCase().slice(0, 50) !==
+          newText.toLowerCase().slice(0, 50)
+      );
+    };
   
     // --- Score each round ---
     for (const r of Object.keys(rounds)) {
@@ -173,45 +183,87 @@ export default function TextToText() {
       let scoreA = 0;
       let scoreB = 0;
   
+      let lastOfferA = "";
+      let lastOfferB = "";
+  
       for (const m of turns) {
         if (m.kind !== "turn") continue;
-        const wordCount = m.content.split(/\s+/).length;
   
-        // Conciseness weighting
-        let concisenessScore = 0;
-        if (wordCount >= 20 && wordCount <= 45) concisenessScore = 20;
-        else if (wordCount > 45) concisenessScore = 10;
-        else concisenessScore = 5;
+        let total = 0;
+        const content = m.content.toLowerCase();
   
-        const clarityScore = (m.content.match(clarityKeywords) || []).length * 5;
-        const confidenceScore = (m.content.match(confidenceKeywords) || []).length * 8;
-        const total = concisenessScore + clarityScore + confidenceScore;
+        // 1. Concreteness (numbers = offers / constraints)
+        if (hasNumericOffer(content)) total += 10;
+  
+        // 2. Concession / Flexibility
+        if (isAgent1(m.speaker)) {
+          if (lastOfferA && lastOfferA !== content) total += 6;
+          lastOfferA = content;
+        } else {
+          if (lastOfferB && lastOfferB !== content) total += 6;
+          lastOfferB = content;
+        }
+  
+        // 3. Responsiveness (engaging with the other agent)
+        if (
+          isAgent1(m.speaker) &&
+          lastOfferB &&
+          content.includes(lastOfferB.slice(0, 15))
+        ) {
+          total += 5;
+        }
+  
+        if (
+          !isAgent1(m.speaker) &&
+          lastOfferA &&
+          content.includes(lastOfferA.slice(0, 15))
+        ) {
+          total += 5;
+        }
+  
+        // 4. Light contradiction penalty
+        if (isAgent1(m.speaker)) {
+          if (contradiction(lastOfferA, content)) total -= 3;
+        } else {
+          if (contradiction(lastOfferB, content)) total -= 3;
+        }
   
         if (isAgent1(m.speaker)) scoreA += total;
         else scoreB += total;
       }
   
-      // --- Round decision ---
-      if (scoreA > scoreB) roundsWonA += 1;
-      else if (scoreB > scoreA) roundsWonB += 1;
+      // Determine round winner
+      if (scoreA > scoreB) roundsWonA++;
+      else if (scoreB > scoreA) roundsWonB++;
       else {
-        // Tie → half point each
         roundsWonA += 0.5;
         roundsWonB += 0.5;
       }
     }
   
-    // --- Deterministic tie-breaker ---
-    let winnerName = "Tie";
-    if (roundsWonA > roundsWonB) winnerName = form.agent1.name;
-    else if (roundsWonB > roundsWonA) winnerName = form.agent2.name;
-    else {
-      // alphabetic deterministic tiebreak
-      winnerName = form.agent1.name < form.agent2.name ? form.agent1.name : form.agent2.name;
-    }
-  
-    setWinner(`Negotiation Winner: ${winnerName} (Rounds: ${roundsWonA} – ${roundsWonB})`);
-  }  
+// --- Final winner determination ---
+
+// Special case: 0–0 → automatic tie
+if (roundsWonA === 0 && roundsWonB === 0) {
+  setWinner(`Tie (Rounds: 0 – 0)`);
+  return;
+}
+
+let winnerName = "";
+
+if (roundsWonA > roundsWonB) {
+  winnerName = form.agent1.name;
+} else if (roundsWonB > roundsWonA) {
+  winnerName = form.agent2.name;
+} else {
+  // regular tie
+  winnerName = "Tie";
+}
+
+// IMPORTANT: Do NOT prepend "Negotiation Winner:" here
+setWinner(`${winnerName} (Rounds: ${roundsWonA} – ${roundsWonB})`);
+
+  }   
 
   useEffect(() => {
     if (!stickToBottom) return;
@@ -428,8 +480,35 @@ export default function TextToText() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Bot–Bot Negotiation</h2>
         <div style={{ display: "flex", gap: 8 }}>
-          <Button variant="ghost" size="sm" onClick={() => { setShowShortcuts(false); setOpenSettings(true); }}>⚙ Settings</Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowShortcuts((v) => !v)}>? Keyboard Shortcuts</Button>
+        <Button
+  variant="ghost"
+  size="sm"
+  onClick={() => {
+    setShowShortcuts(false);
+    setOpenSettings(true);
+  }}
+>
+  ⚙ Settings
+</Button>
+<Button
+  variant="ghost"
+  size="sm"
+  onClick={() => setShowShortcuts((v) => !v)}
+>
+  ? Keyboard Shortcuts
+</Button>
+<Button
+  variant="ghost"
+  size="sm"
+  onClick={() => {
+    setShowShortcuts(false);
+    setOpenScoringInfo(true);
+  }}
+>
+  ℹ︎ Scoring Info
+</Button>
+        
+        
         </div>
       </div>
 
@@ -599,18 +678,46 @@ export default function TextToText() {
     </>
   }
 >
-  {/* Model + Rounds */}
-  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-    <Input label="Model" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
-    <Input
-      label="Rounds"
-      type="number"
-      min={1}
-      max={20}
-      value={form.rounds}
-      onChange={(e) => setForm(f => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))}
-    />
-  </div> 
+{/* Model + Rounds */}
+<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+  {/* Model dropdown */}
+  <div style={{ display: "flex", flexDirection: "column" }}>
+    <label style={{ fontWeight: 500, marginBottom: 4 }}>Model</label>
+    <select
+      value={form.model}
+      onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))}
+      style={{
+        padding: "8px 10px",
+        borderRadius: 8,
+        border: "1px solid #ccc",
+        backgroundColor: "white",
+        fontSize: 14,
+      }}
+    >
+      <option value="gpt-5.1">gpt-5.1</option>
+      <option value="gpt-5">gpt-5</option>
+      <option value="gpt-5-mini">gpt-5-mini</option>
+      <option value="gpt-5-nano">gpt-5-nano</option>
+      <option value="gpt-4o">gpt-4o</option>
+      <option value="gpt-4o-mini">gpt-4o-mini</option>
+    </select>
+  </div>
+
+  {/* Rounds input */}
+  <Input
+    label="Rounds"
+    type="number"
+    min={1}
+    max={20}
+    value={form.rounds}
+    onChange={(e) =>
+      setForm(f => ({
+        ...f,
+        rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)),
+      }))
+    }
+  />
+</div>
 
   {/* Topic */}
   <div style={{ marginTop: 12 }}>
@@ -639,6 +746,45 @@ export default function TextToText() {
       <Textarea label="Persona" rows={5} value={form.agent2.persona} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))} />
       <Textarea label="Goal / Stance" rows={2} value={form.agent2.stance} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))} />
     </div>
+  </div>
+</Modal>
+
+    {/* Scoring Info Modal */}
+<Modal
+  open={openScoringInfo}
+  onClose={() => setOpenScoringInfo(false)}
+  title="Negotiation Scoring"
+  footer={
+    <Button variant="outline" onClick={() => setOpenScoringInfo(false)}>
+      Close
+    </Button>
+  }
+>
+  <div className="p-2">
+    <p className="text-sm text-neutral-300 leading-relaxed">
+      Points are awarded per round based on:
+    </p>
+
+    <ul className="list-disc ml-6 mt-3 space-y-1 text-neutral-300 text-sm leading-relaxed">
+      <li>
+        <span className="font-semibold text-white">Concreteness:</span> Providing clear offers, ranges, or numeric constraints.
+      </li>
+      <li>
+        <span className="font-semibold text-white">Flexibility:</span> Adjusting a previous position or making compromises while remaining true to character.
+      </li>
+      <li>
+        <span className="font-semibold text-white">Responsiveness:</span> Engaging directly with the other agent’s most recent offer.
+      </li>
+      <li>
+        <span className="font-semibold text-white">Consistency:</span> Maintaining a consistent position without contradicting earlier turns.
+      </li>
+    </ul>
+
+    <p className="text-sm text-neutral-300 leading-relaxed mt-4">
+      Each round is scored independently. The agent with the higher score wins the round and will be awarded 1 point.
+      If both agents end with <strong className="text-white">0 – 0</strong> rounds,
+      the negotiation results in a tie.
+    </p>
   </div>
 </Modal>
 </div>
