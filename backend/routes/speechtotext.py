@@ -26,7 +26,32 @@ class SpeechSettings(BaseModel):
 class TextPrompt(BaseModel):
     text: str
 
-current_settings = None
+current_settings = SpeechSettings(
+    model="gpt-4o-mini",
+    topic="Negotiation over the price of Emily's used car.",
+    rules=(
+        "NEGOTIATION RULES:\n"
+        "1) Respond in EXACTLY two sentences per turn after your introduction.\n"
+        "2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n"
+        "3) No markdown, no emojis, no bullet points.\n"
+        "4) Stay civil, concise, and on-topic; avoid generic platitudes.\n"
+        "5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation."
+    ),
+    bot=BotConfig(
+        name="Emily",
+        personality=(
+            "You are Emily, a car owner trying to sell your used car for $15,000. "
+            "You know the car is probably worth less, but you want to take advantage of the "
+            "current limited supply of cars by anchoring high and emphasizing scarcity, while "
+            "still remaining honest about its condition."
+        ),
+        goal=(
+            "Aim to keep the final price as close to $15,000 as possible by stressing the limited "
+            "market and the car’s positives, but be prepared to compromise enough to close the deal."
+        ),
+    ),
+)
+
 
 @router.post("/speech-to-text/update-settings")
 async def update_settings(settings: SpeechSettings):
