@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/CardB
 import ChatBubble from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
+import DownloadChatButton from "../components/ui/DownloadChatButton";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -93,6 +94,7 @@ export default function SpeechToText() {
       }
     };
   }, []);
+
 
     // Keyboard shortcuts
   useEffect(() => {
@@ -232,11 +234,11 @@ export default function SpeechToText() {
       console.log("Recording started...");
 
       // Update recording time every second
-      timerRef.current = setInterval(() => {
+      timerRef.current = window.setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
 
-      maxTimeoutRef.current = setTimeout(() => {
+      maxTimeoutRef.current = window.setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
           console.log("Max recording time reached, stopping...");
           stopRecording();
@@ -320,6 +322,13 @@ export default function SpeechToText() {
       setError(err.message || "Failed to send transcript to bot");
     }
   }
+
+  const chatTranscript = useMemo(() => {
+  if (messages.length === 0) return "";
+  return messages
+    .map((m) => `${m.speaker}: ${m.content}`)
+    .join("\n\n");
+}, [messages]);
 
 
   return (
@@ -405,6 +414,8 @@ export default function SpeechToText() {
                 ⏹ Stop ({MAX_RECORDING_TIME - recordingTime}s)
               </Button>
             )}
+          <DownloadChatButton transcript={chatTranscript} />
+
           </div>
         </CardHeader>
         <CardContent
