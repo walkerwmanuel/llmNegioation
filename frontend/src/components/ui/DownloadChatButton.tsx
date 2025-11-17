@@ -1,15 +1,38 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Document, Packer, Paragraph, TextRun } from "docx";
+import { Button } from "./Button";
 
 interface DownloadChatButtonProps {
-  transcript: string;        // Full text transcript to export
-  filename?: string;         // Optional filename
+  transcript: string;
+  filename?: string;  // if provided, overrides timestamp generation
 }
 
 export default function DownloadChatButton({
   transcript,
-  filename = "negotiation_transcript.docx",
+  filename,
 }: DownloadChatButtonProps) {
+
+  // Build timestamp-only filename if none provided
+  const computedFilename = useMemo(() => {
+    if (filename) return filename;
+
+    const now = new Date();
+
+    const date = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    const time = [
+      String(now.getHours()).padStart(2, "0"),
+      String(now.getMinutes()).padStart(2, "0"),
+      String(now.getSeconds()).padStart(2, "0"),
+    ].join("-");
+
+    return `negotiation_${date}_${time}.docx`;
+  }, [filename]);
+
   const handleDownload = useCallback(async () => {
     const clean = transcript.trim();
     if (!clean) {
@@ -17,7 +40,6 @@ export default function DownloadChatButton({
       return;
     }
 
-    // Build paragraphs (with a title and basic formatting)
     const paragraphs: Paragraph[] = [];
 
     paragraphs.push(
@@ -30,14 +52,13 @@ export default function DownloadChatButton({
           }),
         ],
       }),
-      new Paragraph({}) // blank line
+      new Paragraph({})
     );
 
     const lines = clean.split("\n");
     for (const rawLine of lines) {
       const line = rawLine.replace(/\r$/, "");
 
-      // Style round headers a bit
       if (/^=== Round \d+ ===$/.test(line.trim())) {
         paragraphs.push(
           new Paragraph({
@@ -68,29 +89,17 @@ export default function DownloadChatButton({
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename;
+    a.download = computedFilename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
 
     URL.revokeObjectURL(url);
-  }, [transcript, filename]);
+  }, [transcript, computedFilename]);
 
   return (
-    <button
-      onClick={handleDownload}
-      style={{
-        background: "#4a90e2",
-        color: "white",
-        border: "none",
-        borderRadius: "6px",
-        padding: "10px 16px",
-        cursor: "pointer",
-        marginTop: "12px",
-      }}
-    >
+    <Button variant="default" size="md" onClick={handleDownload}>
       Download Chat (.docx)
-    </button>
+    </Button>
   );
 }
-
