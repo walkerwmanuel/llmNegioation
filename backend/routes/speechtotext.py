@@ -85,7 +85,6 @@ async def transcribe_audio(file: UploadFile = File(...)):
         except:
             pass
 
-        # 👉 ONLY return transcript here
         return {"transcript": user_text}
 
     except Exception as e:

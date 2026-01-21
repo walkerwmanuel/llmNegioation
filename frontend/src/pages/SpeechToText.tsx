@@ -387,7 +387,7 @@ export default function SpeechToText() {
           }}
         >
           <span>
-            <b>Space</b> = Record Audio
+            <b>Space</b> = Start/Stop Recording Audio
           </span>
           <span>
             <b>Control + S</b> = Open Settings
