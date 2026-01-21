@@ -6,6 +6,7 @@ from logic.openai import runSimpleNegotiate
 from dotenv import load_dotenv
 import tempfile
 from openai import OpenAI
+import json
 
 # ====== FETCH KEY ======
 router = APIRouter()
@@ -26,31 +27,8 @@ class SpeechSettings(BaseModel):
 class TextPrompt(BaseModel):
     text: str
 
-current_settings = SpeechSettings(
-    model="gpt-4o-mini",
-    topic="Negotiation over the price of Emily's used car.",
-    rules=(
-        "NEGOTIATION RULES:\n"
-        "1) Respond in EXACTLY two sentences per turn after your introduction.\n"
-        "2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n"
-        "3) No markdown, no emojis, no bullet points.\n"
-        "4) Stay civil, concise, and on-topic; avoid generic platitudes.\n"
-        "5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation."
-    ),
-    bot=BotConfig(
-        name="Emily",
-        personality=(
-            "You are Emily, a car owner trying to sell your used car for $15,000. "
-            "You know the car is probably worth less, but you want to take advantage of the "
-            "current limited supply of cars by anchoring high and emphasizing scarcity, while "
-            "still remaining honest about its condition."
-        ),
-        goal=(
-            "Aim to keep the final price as close to $15,000 as possible by stressing the limited "
-            "market and the car’s positives, but be prepared to compromise enough to close the deal."
-        ),
-    ),
-)
+# Store current settings globally
+current_settings: SpeechSettings | None = None
 
 
 @router.post("/speech-to-text/update-settings")
@@ -92,36 +70,71 @@ async def transcribe_audio(file: UploadFile = File(...)):
         return {"error": str(e)}
 
 
-# 2) Take edited text and get bot reply
+# 2) Take edited text and get bot reply using runSimpleNegotiate
 @router.post("/speech-to-text/respond")
 async def respond_to_text(body: TextPrompt):
     try:
-        user_text = body.text
+        if current_settings is None:
+            return {"error": "Settings not configured. Call /update-settings first."}
 
-        system_prompt = f"""You are {current_settings.bot.name}.
+        user_text = body.text.strip()
+        if not user_text:
+            return {"error": "Empty text provided"}
 
-{current_settings.bot.personality}
-
-Your goal: {current_settings.bot.goal}
-
-Topic of conversation: {current_settings.topic}
-
-{current_settings.rules}
-
-Respond to the user's message following these guidelines."""
-
-        completion = client.chat.completions.create(
-            model=current_settings.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_text},
-            ],
+        # Import the Agent class from wherever it's defined
+        # Assuming it's in logic.openai based on your imports
+        from logic.openai import Agent
+        
+        # Create Agent objects (not dictionaries)
+        agent1 = Agent(
+            name=current_settings.bot.name,
+            personality=current_settings.bot.personality,
+            goal=current_settings.bot.goal
+        )
+        
+        agent2 = Agent(
+            name="You",
+            personality="You are the human user in this conversation.",
+            goal="Engage in the negotiation."
         )
 
-        bot_text = completion.choices[0].message.content
+        # Build existing transcript with user's latest message
+        existing_transcript = f"You:\n{user_text}\n\n"
 
-        return {"you": user_text, "bot": bot_text}
+        # Collect the bot's response from runSimpleNegotiate
+        bot_response = ""
+        
+        for chunk_bytes in runSimpleNegotiate(
+            model=current_settings.model,
+            agent1=agent1,
+            agent2=agent2,
+            topic=current_settings.topic,
+            rules=current_settings.rules,
+            rounds=1,
+            existing_transcript=existing_transcript,
+        ):
+            # Decode bytes to string
+            chunk_str = chunk_bytes.decode("utf-8").strip()
+            if not chunk_str:
+                continue
+                
+            try:
+                data = json.loads(chunk_str)
+                
+                # Extract only the bot's response (agent1 in this case)
+                if data.get("type") == "turn" and data.get("speaker") == current_settings.bot.name:
+                    bot_response = data.get("content", "")
+                    
+            except json.JSONDecodeError:
+                continue
+
+        if not bot_response:
+            return {"error": "No response generated from bot"}
+
+        return {"you": user_text, "bot": bot_response.strip()}
 
     except Exception as e:
         print(f"Error in respond_to_text: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}

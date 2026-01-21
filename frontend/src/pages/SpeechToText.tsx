@@ -95,6 +95,41 @@ export default function SpeechToText() {
     };
   }, []);
 
+  useEffect(() => {
+  // Send initial settings to backend on component mount
+  const initializeSettings = async () => {
+    try {
+      const payload = {
+        model: form.model,
+        topic: form.topic,
+        rules: form.rules,
+        bot: {
+          name: form.agent2.name,
+          personality: form.agent2.persona,
+          goal: form.agent2.stance,
+        },
+      };
+
+      const res = await fetch(SETTINGS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to initialize settings (status ${res.status})`);
+      }
+
+      console.log("Settings initialized successfully:", payload);
+    } catch (err) {
+      console.error("Error initializing settings:", err);
+      setError("Failed to initialize settings");
+    }
+  };
+
+  initializeSettings();
+}, []);
+
 
     // Keyboard shortcuts
   useEffect(() => {
