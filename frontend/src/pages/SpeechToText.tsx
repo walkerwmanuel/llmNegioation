@@ -74,9 +74,9 @@ export default function SpeechToText() {
   const timerRef = useRef<number | null>(null);
   const maxTimeoutRef = useRef<number | null>(null);
 
-  const TRANSCRIBE_URL = "http://localhost:8025/speech-to-text/transcribe";
-  const RESPOND_URL = "http://localhost:8025/speech-to-text/respond";
-  const SETTINGS_URL = "http://localhost:8025/speech-to-text/update-settings";
+  const TRANSCRIBE_URL = "https://belkin-limits-father-rocky.trycloudflare.com/speech-to-text/transcribe";
+  const RESPOND_URL = "https://belkin-limits-father-rocky.trycloudflare.com/speech-to-text/respond";
+  const SETTINGS_URL = "https://belkin-limits-father-rocky.trycloudflare.com/speech-to-text/update-settings";
 
 
   // Auto-scroll chat

@@ -32,7 +32,7 @@ type ChatItem =
       prevContent?: string;
     };
 
-const API_URL = "http://localhost:8025/t2t-negotiate";
+const API_URL = "https://belkin-limits-father-rocky.trycloudflare.com/t2t-negotiate";
 
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
