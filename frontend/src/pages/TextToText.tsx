@@ -1,5 +1,6 @@
 "use client";
 
+import { diffWords } from "diff";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -57,6 +58,28 @@ function serializeTranscript(items: ChatItem[]): string {
     }
   }
   return t.trim();
+}
+
+function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
+  const parts = React.useMemo(() => diffWords(oldText ?? "", newText ?? ""), [oldText, newText]);
+  return (
+    <span style={{ whiteSpace: "pre-wrap" }}>
+      {parts.map((p, i) => {
+        if (p.removed) {
+          return (
+            <span key={i} style={{ textDecoration: "line-through", opacity: 0.7 }}>
+              {p.value}
+            </span>
+          );
+        }
+        if (p.added) {
+          // optional: highlight additions
+          return <span key={i} style={{ background: "rgba(16,185,129,.15)" }}>{p.value}</span>;
+        }
+        return <span key={i}>{p.value}</span>;
+      })}
+    </span>
+  );
 }
 
 async function postStream(url: string, body: any, onMessage: (msg: any) => void, signal?: AbortSignal) {
@@ -420,14 +443,11 @@ export default function TextToText() {
                         background: m.side === "left" ? colors.bubbleA : colors.bubbleB,
                         border: `1px solid ${colors.border}`,
                         marginBottom: 6,
-                        opacity: 0.6,
                         color: colors.muted as string,
-                        textDecoration: "line-through",
-                        whiteSpace: "pre-wrap",
                       }}
-                      title="Previous version"
+                      title="Changes from previous version"
                     >
-                      {m.prevContent}
+                      <DiffText oldText={m.prevContent} newText={m.content} />
                     </div>
                   )}
 
