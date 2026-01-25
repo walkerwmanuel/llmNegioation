@@ -751,6 +751,21 @@ export default function SpeechToText() {
       </Modal>
       {/* Prompt Inspector Side Panel with Tab */}
       <>
+        {/* Overlay to close panel when clicking outside */}
+        {showPromptPanel && (
+          <div
+            onClick={() => setShowPromptPanel(false)}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              background: "rgba(0, 0, 0, 0.3)",
+              zIndex: 999,
+            }}
+          />
+        )}
         {/* Tab (always visible) */}
         <div
           onClick={() => setShowPromptPanel((v) => !v)}
