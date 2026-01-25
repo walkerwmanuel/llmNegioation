@@ -89,7 +89,9 @@ export default function SpeechToText() {
   const [stickToBottom, setStickToBottom] = useState(true);
   const [transcript, setTranscript] = useState("");
   const [hasTranscript, setHasTranscript] = useState(false);
-
+  const [showPromptPanel, setShowPromptPanel] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [lastPromptSent, setLastPromptSent] = useState("");
   
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -381,6 +383,23 @@ export default function SpeechToText() {
       if (!cleaned) {
         throw new Error("Transcript is empty. Please type something before sending.");
       }
+
+      const currentSystemPrompt = `You are ${form.agent2.name}.
+
+  ${form.agent2.persona}
+
+  Your goal: ${form.agent2.stance}
+
+  Topic of conversation: ${form.topic}
+
+  ${form.rules}
+
+  Respond to the users message following these guidelines.`;
+
+      // Store it so we can display it in the panel
+      setSystemPrompt(currentSystemPrompt);
+      setLastPromptSent(`User message: ${cleaned}`);      
+
 
       const res = await fetch(RESPOND_URL, {
         method: "POST",
@@ -730,6 +749,172 @@ export default function SpeechToText() {
           </div>
         </div>
       </Modal>
+      {/* Prompt Inspector Side Panel with Tab */}
+      <>
+        {/* Tab (always visible) */}
+        <div
+          onClick={() => setShowPromptPanel((v) => !v)}
+          style={{
+            position: "fixed",
+            right: showPromptPanel ? "400px" : "0",
+            top: "50%",
+            transform: "translateY(-50%)",
+            width: "20px",
+            height: "120px",
+            background: colors.panel,
+            border: `1px solid ${colors.border}`,
+            borderRight: showPromptPanel ? `1px solid ${colors.border}` : "none",
+            borderTopLeftRadius: "8px",
+            borderBottomLeftRadius: "8px",
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            zIndex: 1001,
+            boxShadow: "-2px 0 8px rgba(0,0,0,0.2)",
+            transition: "right 0.3s ease",
+            gap: "3px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = colors.panelAlt;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = colors.panel;
+          }}
+        >
+          {/* Three vertical lines */}
+          <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
+          <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
+          <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
+        </div>
+
+        {/* Panel (slides in/out) */}
+        {showPromptPanel && (
+          <div
+            style={{
+              position: "fixed",
+              right: 0,
+              top: 0,
+              width: "400px",
+              height: "100vh",
+              background: colors.panel,
+              borderLeft: `1px solid ${colors.border}`,
+              padding: "20px",
+              overflowY: "auto",
+              zIndex: 1000,
+              boxShadow: "-4px 0 12px rgba(0,0,0,0.3)",
+              animation: "slideIn 0.3s ease",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Prompt Inspector</h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowPromptPanel(false)}>
+                ✕ Close
+              </Button>
+            </div>
+
+            {/* System Prompt Section */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+                System Prompt
+              </label>
+              <Textarea
+                rows={12}
+                value={systemPrompt || "No prompt sent yet..."}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                style={{ 
+                  fontFamily: "monospace", 
+                  fontSize: 12,
+                  background: colors.panelAlt,
+                }}
+              />
+              <div style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                This is the system message sent to the AI
+              </div>
+            </div>
+
+            {/* Last User Message */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+                Last User Message
+              </label>
+              <Textarea
+                rows={4}
+                value={lastPromptSent || "No message sent yet..."}
+                readOnly
+                style={{ 
+                  fontFamily: "monospace", 
+                  fontSize: 12,
+                  background: colors.panelAlt,
+                  opacity: 0.8,
+                }}
+              />
+            </div>
+
+            {/* Quick Override Section */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+                Quick Override
+              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <Input
+                  label="Bot Name"
+                  value={form.agent2.name}
+                  onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))}
+                />
+                <Textarea
+                  label="Personality Override"
+                  rows={6}
+                  value={form.agent2.persona}
+                  onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
+                />
+              </div>
+            </div>
+
+            {/* Apply Button */}
+            <Button
+              onClick={async () => {
+                try {
+                  const payload = {
+                    model: form.model,
+                    topic: form.topic,
+                    rules: form.rules,
+                    bot: {
+                      name: form.agent2.name,
+                      personality: form.agent2.persona,
+                      goal: form.agent2.stance,
+                    },
+                  };
+
+                  const res = await fetch(SETTINGS_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  });
+
+                  if (!res.ok) {
+                    throw new Error(`Failed to update settings (status ${res.status})`);
+                  }
+
+                  console.log("Prompt settings updated");
+                  alert("Prompt settings applied!");
+                } catch (err) {
+                  console.error("Error updating settings:", err);
+                  setError("Failed to apply prompt changes");
+                }
+              }}
+              style={{ width: "100%" }}
+            >
+              Apply Prompt Changes
+            </Button>
+
+            <div style={{ fontSize: 11, color: colors.muted, marginTop: 8, textAlign: "center" }}>
+              Changes will apply to the next message
+            </div>
+          </div>
+        )}
+      </>
     </div>
   );
 }
