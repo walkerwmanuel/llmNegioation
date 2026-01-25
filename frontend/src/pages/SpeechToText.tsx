@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
+import { diffWords } from "diff";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Textarea } from "../components/ui/Textarea";
@@ -52,6 +53,28 @@ export default function SpeechToText() {
     }),
     []
   );
+
+  function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
+    const parts = React.useMemo(() => diffWords(oldText ?? "", newText ?? ""), [oldText, newText]);
+    return (
+      <span style={{ whiteSpace: "pre-wrap" }}>
+        {parts.map((p, i) => {
+          if (p.removed) {
+            return (
+              <span key={i} style={{ textDecoration: "line-through", opacity: 0.7 }}>
+                {p.value}
+              </span>
+            );
+          }
+          if (p.added) {
+            // optional: highlight additions
+            return <span key={i} style={{ background: "rgba(16,185,129,.15)" }}>{p.value}</span>;
+          }
+          return <span key={i}>{p.value}</span>;
+        })}
+      </span>
+    );
+  }
 
   const [form, setForm] = useState<FormState>(defaults);
   const [openSettings, setOpenSettings] = useState(false);
@@ -148,9 +171,13 @@ export default function SpeechToText() {
               setDraft("");
             } else if (openSettings) setOpenSettings(false);
           }
-        }
+        }     
         return;
       }
+      if ((event.ctrlKey || event.metaKey) && event.code === "Enter" && hasTranscript && transcript.trim()) {
+        event.preventDefault();
+        sendTranscriptToBot();
+      }     
       // Space = record
       if (event.code === "Space") {
         event.preventDefault();
@@ -175,7 +202,7 @@ export default function SpeechToText() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [messages, recording, openSettings, editingIndex]);
+  }, [messages, recording, openSettings, editingIndex, hasTranscript]);
 
   async function startRecording() {   // Start recording audio
     setError(null);
@@ -303,16 +330,47 @@ export default function SpeechToText() {
   const onSaveEdit = async () => {
     if (editingIndex === null) return;
 
-    const updated = [...messages];
-    const item = updated[editingIndex];
+    try {
+      setError(null);
 
-    // Preserve the old content to display with strikethrough
-    const old = item.content;
-    updated[editingIndex] = { ...item, prevContent: old, content: draft };
+      const updated = [...messages];
+      const item = updated[editingIndex];
 
-    setMessages(updated);
-    setEditingIndex(null);
-    setDraft("");
+      // Preserve the old content to display with strikethrough
+      const old = item.content;
+      updated[editingIndex] = { ...item, prevContent: old, content: draft };
+
+      // Remove messages after edited message
+      const prefix = updated.slice(0, editingIndex + 1);
+
+      setMessages(prefix);
+      setEditingIndex(null)
+      setDraft("");
+
+      if (item.speaker === "You") {
+        const res = await fetch(RESPOND_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: draft.trim() }),
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+
+        const data = await res.json();
+        console.log("Respond response:", data);
+
+        setMessages((prev) => [
+          ...prev,
+          { speaker: form.agent2.name, content: data.bot, side: "right" },
+        ]);
+      }
+    } catch (err: any) {
+      console.error("Error saving edit:", err);
+      setError(err.message || "Failed to save edit and get response");
+    }
   };
 
   async function sendTranscriptToBot() {
@@ -425,10 +483,13 @@ export default function SpeechToText() {
             <b>Space</b> = Start/Stop Recording Audio
           </span>
           <span>
-            <b>Control + S</b> = Open Settings
+            <b>Control / Command + Enter / Return</b> = Send Audio Transcript to Bot
+          </span>          
+          <span>
+            <b>Control / Command + S</b> = Open Settings
           </span>
           <span>
-            <b>Control + E</b> = Edit Last Response
+            <b>Control / Command + E</b> = Edit Last Response
           </span>
         </div>
       )}
@@ -497,14 +558,11 @@ export default function SpeechToText() {
                     background: m.side === "left" ? colors.bubbleA : colors.bubbleB,
                     border: `1px solid ${colors.border}`,
                     marginBottom: 6,
-                    opacity: 0.6,
                     color: colors.muted as string,
-                    textDecoration: "line-through",
-                    whiteSpace: "pre-wrap",
                   }}
-                  title="Previous version"
+                  title="Changes from previous version"
                 >
-                  {m.prevContent}
+                  <DiffText oldText={m.prevContent} newText={m.content} />
                 </div>
               )}
 
