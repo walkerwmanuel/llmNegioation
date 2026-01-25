@@ -380,8 +380,8 @@ export default function TextToText() {
         >
           <span><b>Control / Command + Enter / Return</b> = Start / Restart Negotiation Run </span>   
           <span><b>Space</b> = Pause / Resume </span>    
-          <span><b>Control + 'S'</b> = Open Settings </span>  
-          <span><b>Control + 'E'</b> = Edit Last Response </span>   
+          <span><b>Control / Command + 'S'</b> = Open Settings </span>  
+          <span><b>Control / Command + 'E'</b> = Edit Last Response </span>   
         </div>
       )}
 
