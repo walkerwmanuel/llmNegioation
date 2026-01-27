@@ -156,6 +156,7 @@ export default function TextToText() {
   );
 
   const [form, setForm] = useState<FormState>(defaults);
+  const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
   const [openSettings, setOpenSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [messages, setMessages] = useState<ChatItem[]>([]);
@@ -277,6 +278,7 @@ export default function TextToText() {
         (msg) => {
           if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
           if (msg.type === "turn") {
+            setCurrentSpeaker(msg.speaker);
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
           }
@@ -288,6 +290,7 @@ export default function TextToText() {
     } finally {
       setLoading(false);
       controllerRef.current = null;
+      setCurrentSpeaker(null);
     }
   };
 
@@ -316,6 +319,7 @@ export default function TextToText() {
         (msg) => {
           if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
           if (msg.type === "turn") {
+            setCurrentSpeaker(msg.speaker);
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
           }
@@ -327,6 +331,7 @@ export default function TextToText() {
     } finally {
       setLoading(false);
       controllerRef.current = null;
+      setCurrentSpeaker(null);
     }
   };
 
@@ -363,6 +368,7 @@ export default function TextToText() {
         (msg) => {
           if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
           if (msg.type === "turn") {
+            setCurrentSpeaker(msg.speaker);
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
           }
@@ -374,6 +380,7 @@ export default function TextToText() {
     } finally {
       setLoading(false);
       controllerRef.current = null;
+      setCurrentSpeaker(null);
     }
   };
 
@@ -484,6 +491,7 @@ export default function TextToText() {
                     content={editingIndex === i ? draft : m.content}
                     side={m.side}
                     isEditing={editingIndex === i}
+                    isSpeaking={loading && currentSpeaker === m.speaker}
                     onEdit={() => {
                       setEditingIndex(i);
                       setDraft(m.content);
