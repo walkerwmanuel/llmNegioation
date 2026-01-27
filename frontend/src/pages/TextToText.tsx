@@ -32,7 +32,7 @@ type ChatItem =
       prevContent?: string;
     };
 
-const API_URL = "http://localhost:8025/t2t-negotiate";
+const API_URL = "https://bag-vii-yang-concert.trycloudflare.com/t2t-negotiate";
 
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
@@ -541,7 +541,29 @@ export default function TextToText() {
 >
   {/* Model + Rounds */}
   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-    <Input label="Model" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
+  <div>
+  <label style={{ fontSize: 12, color: colors.muted }}>Model</label>
+  <select
+    value={form.model}
+    onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))}
+    style={{
+      width: "100%",
+      marginTop: 4,
+      padding: "8px 10px",
+      borderRadius: 6,
+      border: `1px solid ${colors.border}`,
+      background: colors.panelAlt,
+      color: colors.text,
+    }}
+  >
+    <option value="gpt-4o-mini">gpt-4o-mini</option>
+    <option value="gpt-4o">gpt-4o</option>
+    <option value="gpt-5-nano">gpt-5-nano</option>
+    <option value="gpt-5-mini">gpt-5-mini</option>
+    <option value="gpt-5.2">gpt-5.2</option>
+  </select>
+</div>
+
     <Input
       label="Rounds"
       type="number"

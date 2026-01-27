@@ -14,12 +14,11 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],    
-    allow_headers=["*"],   
+    allow_origins=["*"], #TODO: Fix it from allowing everything
+    allow_credentials=False,  # Must be False when using "*"
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
 app.include_router(negotiate_router)
 app.include_router(speech_router)
 
