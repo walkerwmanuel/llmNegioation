@@ -82,7 +82,6 @@ async def respond_to_text(body: TextPrompt):
             return {"error": "Empty text provided"}
 
         # Import the Agent class from wherever it's defined
-        # Assuming it's in logic.openai based on your imports
         from logic.openai import Agent
         
         # Create Agent objects (not dictionaries)

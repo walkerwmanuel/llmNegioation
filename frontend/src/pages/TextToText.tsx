@@ -167,6 +167,9 @@ export default function TextToText() {
   const chatRef = useRef<HTMLDivElement | null>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
   const controllerRef = useRef<AbortController | null>(null);
+  const [showPromptPanel, setShowPromptPanel] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [lastPromptSent, setLastPromptSent] = useState("");
 
   useEffect(() => {
     if (!stickToBottom) return;
@@ -247,6 +250,26 @@ export default function TextToText() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
+    // Build the system prompt for display
+    const currentSystemPrompt = `NEGOTIATION TOPIC: ${form.topic}
+
+  RULES:
+  ${form.rules}
+
+  AGENT 1 - ${form.agent1.name}:
+  Persona: ${form.agent1.persona}
+  Goal/Stance: ${form.agent1.stance}
+
+  AGENT 2 - ${form.agent2.name}:
+  Persona: ${form.agent2.persona}
+  Goal/Stance: ${form.agent2.stance}
+
+  Model: ${form.model}
+  Rounds: ${form.rounds}`;
+
+    setSystemPrompt(currentSystemPrompt);
+    setLastPromptSent("Starting new negotiation (no existing transcript)");  
+
     try {
       await postStream(
         API_URL,
@@ -284,6 +307,8 @@ export default function TextToText() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
+    setLastPromptSent(`Resuming from existing transcript:\n${transcript}`);
+  
     try {
       await postStream(
         API_URL,
@@ -328,6 +353,8 @@ export default function TextToText() {
     const transcript = serializeTranscript(prefix);
     const controller = new AbortController();
     controllerRef.current = controller;
+
+    setLastPromptSent(`Re-running from edited message:\n${transcript}`);
 
     try {
       await postStream(
@@ -380,8 +407,8 @@ export default function TextToText() {
         >
           <span><b>Control / Command + Enter / Return</b> = Start / Restart Negotiation Run </span>   
           <span><b>Space</b> = Pause / Resume </span>    
-          <span><b>Control + 'S'</b> = Open Settings </span>  
-          <span><b>Control + 'E'</b> = Edit Last Response </span>   
+          <span><b>Control / Command + 'S'</b> = Open Settings </span>  
+          <span><b>Control / Command + 'E'</b> = Edit Last Response </span>   
         </div>
       )}
 
@@ -514,7 +541,29 @@ export default function TextToText() {
 >
   {/* Model + Rounds */}
   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-    <Input label="Model" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
+  <div>
+  <label style={{ fontSize: 12, color: colors.muted }}>Model</label>
+  <select
+    value={form.model}
+    onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))}
+    style={{
+      width: "100%",
+      marginTop: 4,
+      padding: "8px 10px",
+      borderRadius: 6,
+      border: `1px solid ${colors.border}`,
+      background: colors.panelAlt,
+      color: colors.text,
+    }}
+  >
+    <option value="gpt-4o-mini">gpt-4o-mini</option>
+    <option value="gpt-4o">gpt-4o</option>
+    <option value="gpt-5-nano">gpt-5-nano</option>
+    <option value="gpt-5-mini">gpt-5-mini</option>
+    <option value="gpt-5.2">gpt-5.2</option>
+  </select>
+</div>
+
     <Input
       label="Rounds"
       type="number"
@@ -554,6 +603,202 @@ export default function TextToText() {
     </div>
   </div>
 </Modal>
+{/* Prompt Inspector Side Panel with Tab */}
+<>
+  {/* Overlay to close panel when clicking outside */}
+  {showPromptPanel && (
+    <div
+      onClick={() => setShowPromptPanel(false)}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        background: "rgba(0, 0, 0, 0.3)",
+        zIndex: 999,
+      }}
+    />
+  )}
+  {/* Tab (always visible) */}
+  <div
+    onClick={() => setShowPromptPanel((v) => !v)}
+    style={{
+      position: "fixed",
+      right: showPromptPanel ? "400px" : "0",
+      top: "50%",
+      transform: "translateY(-50%)",
+      width: "20px",
+      height: "120px",
+      background: colors.panel,
+      border: `1px solid ${colors.border}`,
+      borderRight: showPromptPanel ? `1px solid ${colors.border}` : "none",
+      borderTopLeftRadius: "8px",
+      borderBottomLeftRadius: "8px",
+      display: "flex",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      zIndex: 1001,
+      boxShadow: "-2px 0 8px rgba(0,0,0,0.2)",
+      transition: "right 0.3s ease",
+      gap: "3px",
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.background = colors.panelAlt;
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.background = colors.panel;
+    }}
+  >
+    {/* Three vertical lines */}
+    <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
+    <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
+    <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
+  </div>
+
+  {/* Panel (slides in/out) */}
+  {showPromptPanel && (
+    <div
+      style={{
+        position: "fixed",
+        right: 0,
+        top: 0,
+        width: "400px",
+        height: "100vh",
+        background: colors.panel,
+        borderLeft: `1px solid ${colors.border}`,
+        padding: "20px",
+        overflowY: "auto",
+        zIndex: 1000,
+        boxShadow: "-4px 0 12px rgba(0,0,0,0.3)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Prompt Inspector</h3>
+        <Button variant="ghost" size="sm" onClick={() => setShowPromptPanel(false)}>
+          ✕ Close
+        </Button>
+      </div>
+
+      {/* System Configuration */}
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+          System Configuration
+        </label>
+        <Textarea
+          rows={14}
+          value={systemPrompt || "No negotiation started yet..."}
+          onChange={(e) => setSystemPrompt(e.target.value)}
+          style={{ 
+            fontFamily: "monospace", 
+            fontSize: 11,
+            background: colors.panelAlt,
+          }}
+        />
+        <div style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+          Full configuration sent to the AI
+        </div>
+      </div>
+
+      {/* Current Transcript State */}
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+          Current Transcript State
+        </label>
+        <Textarea
+          rows={6}
+          value={lastPromptSent || "No messages sent yet..."}
+          readOnly
+          onChange={() => {}}
+          style={{ 
+            fontFamily: "monospace", 
+            fontSize: 11,
+            background: colors.panelAlt,
+            opacity: 0.8,
+            resize: "vertical",
+          }}
+        />
+      </div>
+
+      {/* Quick Override Section */}
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+          Quick Agent Override
+        </label>
+        
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Agent 1: {form.agent1.name}</div>
+          <Textarea
+            label="Persona"
+            rows={4}
+            value={form.agent1.persona}
+            onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))}
+            style={{ fontSize: 12 }}
+          />
+          <Textarea
+            label="Stance"
+            rows={2}
+            value={form.agent1.stance}
+            onChange={(e) => setForm((f) => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))}
+            style={{ fontSize: 12, marginTop: 8 }}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Agent 2: {form.agent2.name}</div>
+          <Textarea
+            label="Persona"
+            rows={4}
+            value={form.agent2.persona}
+            onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
+            style={{ fontSize: 12 }}
+          />
+          <Textarea
+            label="Stance"
+            rows={2}
+            value={form.agent2.stance}
+            onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))}
+            style={{ fontSize: 12, marginTop: 8 }}
+          />
+        </div>
+      </div>
+
+      {/* Apply Button */}
+      <Button
+        onClick={() => {
+          // Just update the system prompt preview
+          const updatedPrompt = `NEGOTIATION TOPIC: ${form.topic}
+
+RULES:
+${form.rules}
+
+AGENT 1 - ${form.agent1.name}:
+Persona: ${form.agent1.persona}
+Goal/Stance: ${form.agent1.stance}
+
+AGENT 2 - ${form.agent2.name}:
+Persona: ${form.agent2.persona}
+Goal/Stance: ${form.agent2.stance}
+
+Model: ${form.model}
+Rounds: ${form.rounds}`;
+
+          setSystemPrompt(updatedPrompt);
+          alert("Changes will apply on next run/resume!");
+        }}
+        style={{ width: "100%" }}
+      >
+        Preview Changes
+      </Button>
+
+      <div style={{ fontSize: 11, color: colors.muted, marginTop: 8, textAlign: "center" }}>
+        Changes apply immediately to new runs
+      </div>
+    </div>
+  )}
+</>
 </div>
   );
 }
