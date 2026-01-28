@@ -2,11 +2,10 @@
 
 This README provides setup and run instructions for **Project 38**, including how to install the required Python packages and start the frontend/backend server. It serves as a quick-start guide to help you configure the environment, install dependencies, and run the negotiation platform locally for development or testing.
 
-## For Direct Web Access try the link as follows: 
-https://llm-negioation-oijz.vercel.app/
+## Direct Access Web Link
+[Vercel Link](https://llm-negioation-oijz.vercel.app/)
 
-## For User Hosted Session Follow Instructions Below
-## Installing Packages
+## Installing Packages for User Hosted Sessions
 
 Before installing packages, make sure [Python 3](https://www.python.org/downloads/) is installed. This will ensure that Python-based packages can install and execute properly. Verify that Python is installed by running the following command in your terminal: 
 
@@ -14,20 +13,22 @@ Before installing packages, make sure [Python 3](https://www.python.org/download
 python --version
 ``` 
 
-There are four packages required to run the environment:
-- openai: Official OpenAI library for interacting with OpenAI's API
-- fastapi: Web framework for building APIs with Python
-- python-dotenv: Loads environment variables from a `.env` file, keeping API keys and configuration secure.
-- uvicorn: Server used to run FastAPI applications
+There are six packages required to run the environment:
+- **fastapi**: Web framework for building APIs with Python  
+- **openai**: Official OpenAI library for interacting with OpenAI's API  
+- **python-dotenv**: Loads environment variables from a `.env` file, keeping API keys and configuration secure  
+- **python-multipart**: Handles file data and form uploads  
+- **uvicorn**: Server used to run FastAPI applications  
+- **vite**: Provides development server for frontend
 
 
 To install all packages, run this command in your VS Code terminal: 
 ```bash
-pip install openai fastapi python-dotenv uvicorn
+pip install fastapi openai python-dotenv python-multipart uvicorn vite
 ```
 
 ## Running Frontend
-Before launching the frontend server, ensure that Node Package Manager (npm) is installed. Also note the installation command only has to be run once:
+Before launching the frontend server, ensure that [Node Package Manager (npm)](https://nodejs.org/en/download) is installed. Also note the installation command only has to be run once:
 
 ```bash
 npm i 
