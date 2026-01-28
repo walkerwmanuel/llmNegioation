@@ -28,6 +28,17 @@ type ChatItem = {
   prevContent?: string;
 };
 
+const spinnerKeyframes = `
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
 
 export default function SpeechToText() {
   const defaults: FormState = useMemo(
@@ -98,6 +109,7 @@ export default function SpeechToText() {
   const chatRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<number | null>(null);
   const maxTimeoutRef = useRef<number | null>(null);
+  const [sendingToBot, setSendingToBot] = useState(false);
 
   const TRANSCRIBE_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/transcribe";
   const RESPOND_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/respond";
@@ -176,7 +188,7 @@ export default function SpeechToText() {
         }     
         return;
       }
-      if ((event.ctrlKey || event.metaKey) && event.code === "Enter" && hasTranscript && transcript.trim()) {
+      if ((event.ctrlKey || event.metaKey) && event.code === "Enter" && hasTranscript && transcript.trim() && !sendingToBot) {
         event.preventDefault();
         sendTranscriptToBot();
       }     
@@ -204,7 +216,7 @@ export default function SpeechToText() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [messages, recording, openSettings, editingIndex, hasTranscript]);
+  }, [messages, recording, openSettings, editingIndex, hasTranscript, sendingToBot]);
 
   async function startRecording() {   // Start recording audio
     setError(null);
@@ -376,8 +388,10 @@ export default function SpeechToText() {
   };
 
   async function sendTranscriptToBot() {
+    if (sendingToBot) return;
     try {
       setError(null);
+      setSendingToBot(true);
 
       const cleaned = transcript.trim();
       if (!cleaned) {
@@ -432,6 +446,8 @@ export default function SpeechToText() {
     } catch (err: any) {
       console.error("Error sending transcript:", err);
       setError(err.message || "Failed to send transcript to bot");
+    } finally {
+      setSendingToBot(false);
     }
   }
 
@@ -444,492 +460,531 @@ export default function SpeechToText() {
 
 
   return (
-    <div
-      style={{
-        width: "90vw",
-        height: "90vh",
-        margin: "5vh auto",
-        display: "flex",
-        flexDirection: "column",
-        color: colors.text,
-      }}
-    >
+    <>
+      <style>{spinnerKeyframes}</style>
       <div
         style={{
+          width: "90vw",
+          height: "90vh",
+          margin: "5vh auto",
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
+          flexDirection: "column",
+          color: colors.text,
         }}
       >
-        <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Human-Bot Negotiation</h2>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setShowShortcuts(false);
-              setOpenSettings(true);
-            }}
-          >
-            ⚙ Settings
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowShortcuts((v) => !v)}>
-            ? Keyboard Shortcuts
-          </Button>
-        </div>
-      </div>
-
-      {showShortcuts && (
         <div
           style={{
             display: "flex",
-            justifyContent: "center",
+            justifyContent: "space-between",
             alignItems: "center",
-            flexWrap: "wrap",
-            gap: "32px",
-            fontSize: 15,
-            fontWeight: 500,
-            background: colors.panelAlt,
-            border: `1px solid ${colors.border}`,
-            borderRadius: 8,
-            padding: "8px 12px",
-            marginBottom: 12,
-            color: colors.muted,
+            marginBottom: 16,
           }}
         >
-          <span>
-            <b>Space</b> = Start/Stop Recording Audio
-          </span>
-          <span>
-            <b>Control / Command + Enter / Return</b> = Send Audio Transcript to Bot
-          </span>          
-          <span>
-            <b>Control / Command + S</b> = Open Settings
-          </span>
-          <span>
-            <b>Control / Command + E</b> = Edit Last Response
-          </span>
-        </div>
-      )}
-
-      <Card style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <CardHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <CardTitle>Negotiation</CardTitle>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {recording && (
-              <span style={{ fontSize: 14, color: colors.muted }}>
-                {recordingTime}s / {MAX_RECORDING_TIME}s
-              </span>
-            )}
-            {!recording ? (
-              <Button onClick={startRecording}>🎤 Start Recording</Button>
-            ) : (
-              <Button onClick={stopRecording} variant="outline">
-                ⏹ Stop ({MAX_RECORDING_TIME - recordingTime}s)
-              </Button>
-            )}
-          <DownloadChatButton transcript={chatTranscript} />
-
+          <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Human-Bot Negotiation</h2>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowShortcuts(false);
+                setOpenSettings(true);
+              }}
+            >
+              ⚙ Settings
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowShortcuts((v) => !v)}>
+              ? Keyboard Shortcuts
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent
-          style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
-        >
-          {err && (
-            <div
-              style={{
-                padding: 12,
-                borderRadius: 8,
-                border: "1px solid #7f1d1d",
-                background: "#1f1111",
-                color: "#fecaca",
-                marginBottom: 12,
-              }}
-            >
-              {err}
-            </div>
-          )}
+        </div>
 
-          {messages.length === 0 && !recording && !hasTranscript && (
-            <div style={{ color: colors.muted, fontSize: 14 }}>
-              Press 🎤 to record your voice.
-            </div>
-          )}
+        {showShortcuts && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "32px",
+              fontSize: 15,
+              fontWeight: 500,
+              background: colors.panelAlt,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 8,
+              padding: "8px 12px",
+              marginBottom: 12,
+              color: colors.muted,
+            }}
+          >
+            <span>
+              <b>Space</b> = Start/Stop Recording Audio
+            </span>
+            <span>
+              <b>Control / Command + Enter / Return</b> = Send Audio Transcript to Bot
+            </span>          
+            <span>
+              <b>Control / Command + S</b> = Open Settings
+            </span>
+            <span>
+              <b>Control / Command + E</b> = Edit Last Response
+            </span>
+          </div>
+        )}
 
-          {/* Chat messages */}
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: m.side === "left" ? "flex-start" : "flex-end",
-              }}
-            >
-              {/* Old message (if edited) */}
-              {m.prevContent && (
-                <div
-                  style={{
-                    maxWidth: "70%",
-                    padding: "8px 10px",
-                    borderRadius: 12,
-                    background: m.side === "left" ? colors.bubbleA : colors.bubbleB,
-                    border: `1px solid ${colors.border}`,
-                    marginBottom: 6,
-                    color: colors.muted as string,
-                  }}
-                  title="Changes from previous version"
-                >
-                  <DiffText oldText={m.prevContent} newText={m.content} />
-                </div>
+        <Card style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          <CardHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <CardTitle>Negotiation</CardTitle>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {recording && (
+                <span style={{ fontSize: 14, color: colors.muted }}>
+                  {recordingTime}s / {MAX_RECORDING_TIME}s
+                </span>
               )}
+              {!recording ? (
+                <Button onClick={startRecording}>🎤 Start Recording</Button>
+              ) : (
+                <Button onClick={stopRecording} variant="outline">
+                  ⏹ Stop ({MAX_RECORDING_TIME - recordingTime}s)
+                </Button>
+              )}
+            <DownloadChatButton transcript={chatTranscript} />
 
-              {/* Current message */}
-              <ChatBubble
-                name={m.speaker}
-                content={editingIndex === i ? draft : m.content}
-                side={m.side}
-                isEditing={editingIndex === i}
-                onEdit={() => {
-                  setEditingIndex(i);
-                  setDraft(m.content);
-                  setStickToBottom(false);
+            </div>
+          </CardHeader>
+          <CardContent
+            style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
+          >
+            {err && (
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 8,
+                  border: "1px solid #7f1d1d",
+                  background: "#1f1111",
+                  color: "#fecaca",
+                  marginBottom: 12,
                 }}
-                onChange={setDraft}
-                onCancel={() => {
-                  setEditingIndex(null);
-                  setDraft("");
+              >
+                {err}
+              </div>
+            )}
+
+            {messages.length === 0 && !recording && !hasTranscript && (
+              <div style={{ color: colors.muted, fontSize: 14 }}>
+                Press 🎤 to record your voice.
+              </div>
+            )}
+
+            {/* Chat messages */}
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: m.side === "left" ? "flex-start" : "flex-end",
                 }}
-                onSave={onSaveEdit}
+              >
+                {/* Old message (if edited) */}
+                {m.prevContent && (
+                  <div
+                    style={{
+                      maxWidth: "70%",
+                      padding: "8px 10px",
+                      borderRadius: 12,
+                      background: m.side === "left" ? colors.bubbleA : colors.bubbleB,
+                      border: `1px solid ${colors.border}`,
+                      marginBottom: 6,
+                      color: colors.muted as string,
+                    }}
+                    title="Changes from previous version"
+                  >
+                    <DiffText oldText={m.prevContent} newText={m.content} />
+                  </div>
+                )}
+
+                {/* Current message */}
+                <ChatBubble
+                  name={m.speaker}
+                  content={editingIndex === i ? draft : m.content}
+                  side={m.side}
+                  isEditing={editingIndex === i}
+                  onEdit={() => {
+                    setEditingIndex(i);
+                    setDraft(m.content);
+                    setStickToBottom(false);
+                  }}
+                  onChange={setDraft}
+                  onCancel={() => {
+                    setEditingIndex(null);
+                    setDraft("");
+                  }}
+                  onSave={onSaveEdit}
+                />
+              </div>
+            ))}
+
+            {hasTranscript && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 8,
+                  border: `1px solid ${colors.border}`,
+                  background: colors.panelAlt,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  opacity: sendingToBot ? 0.6 : 1,
+                  pointerEvents: sendingToBot ? "none" : "auto",
+                }}
+              >
+                <div style={{ fontSize: 14, color: colors.muted, marginBottom: 4 }}>
+                  {sendingToBot ? (
+                    <span>Sending to Bot...</span>
+                  ) : (
+                    <span>Edit your transcript below, then press <b>Send to Bot</b>.</span>
+                  )}
+                </div>
+
+                <Textarea
+                  label="Transcript"
+                  rows={4}
+                  value={transcript}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  disabled={sendingToBot}
+                />
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setHasTranscript(false);
+                      setTranscript("");
+                    }}
+                    disabled={sendingToBot}
+                  >
+                    Discard
+                  </Button>
+
+                  <Button 
+                    size="sm" 
+                    onClick={sendTranscriptToBot}
+                    disabled={sendingToBot || !transcript.trim()}
+                  >
+                    {sendingToBot ? "Sending..." : "Send to Bot"}  
+                  </Button>
+                </div>
+                {/* Loading spinner */}
+                {sendingToBot && (
+                  <div style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    color: colors.muted,
+                    marginTop: 4
+                  }}>
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        border: `2px solid ${colors.border}`,
+                        borderTopColor: colors.text,
+                        borderRadius: "50%",
+                        animation: "spin 0.8s linear infinite",
+                      }}
+                    />
+                    <span>Processing your message...</span>
+                  </div>
+                )}    
+              </div>  
+            )}
+          </CardContent>
+        </Card>
+
+        <Modal
+          open={openSettings}
+          onClose={() => setOpenSettings(false)}
+          title="Conversation Settings"
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setOpenSettings(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  setOpenSettings(false);
+                  try {
+                    const payload = {
+                      model: form.model,
+                      topic: form.topic,
+                      rules: form.rules,
+                      bot: {
+                        name: form.agent2.name,
+                        personality: form.agent2.persona,
+                        goal: form.agent2.stance,
+                      },
+                    };
+
+                    const res = await fetch(SETTINGS_URL, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    });
+
+                    if (!res.ok) {
+                      throw new Error(`Failed to update settings (status ${res.status})`);
+                    }
+
+                    console.log("Settings updated successfully:", payload);
+                  } catch (err) {
+                    console.error("Error updating settings:", err);
+                    setError("Failed to save settings");
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </>
+          }
+        >
+          {/* Model */}
+          <div style={{ marginBottom: 12 }}>
+            <Input
+              label="Model"
+              value={form.model}
+              onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+            />
+          </div>
+
+          {/* Topic */}
+          <div style={{ marginBottom: 12 }}>
+            <Input
+              label="Topic"
+              value={form.topic}
+              onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))}
+            />
+          </div>
+
+          {/* Rules */}
+          <div style={{ marginBottom: 12 }}>
+            <Textarea
+              label="Rules"
+              rows={6}
+              value={form.rules}
+              onChange={(e) => setForm((f) => ({ ...f, rules: e.target.value }))}
+            />
+          </div>
+
+          {/* Bot Settings */}
+          <div style={{ marginTop: 20 }}>
+            <h4 style={{ marginBottom: 8 }}>Bot Configuration</h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <Input
+                label="Bot Name"
+                value={form.agent2.name}
+                onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))}
+              />
+              <Textarea
+                label="Bot Persona"
+                rows={5}
+                value={form.agent2.persona}
+                onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
+              />
+              <Textarea
+                label="Bot Goal / Stance"
+                rows={2}
+                value={form.agent2.stance}
+                onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))}
               />
             </div>
-          ))}
+          </div>
+        </Modal>
+        {/* Prompt Inspector Side Panel with Tab */}
+        <>
+          {/* Overlay to close panel when clicking outside */}
+          {showPromptPanel && (
+            <div
+              onClick={() => setShowPromptPanel(false)}
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                background: "rgba(0, 0, 0, 0.3)",
+                zIndex: 999,
+              }}
+            />
+          )}
+          {/* Tab (always visible) */}
+          <div
+            onClick={() => setShowPromptPanel((v) => !v)}
+            style={{
+              position: "fixed",
+              right: showPromptPanel ? "400px" : "0",
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: "20px",
+              height: "120px",
+              background: colors.panel,
+              border: `1px solid ${colors.border}`,
+              borderRight: showPromptPanel ? `1px solid ${colors.border}` : "none",
+              borderTopLeftRadius: "8px",
+              borderBottomLeftRadius: "8px",
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              zIndex: 1001,
+              boxShadow: "-2px 0 8px rgba(0,0,0,0.2)",
+              transition: "right 0.3s ease",
+              gap: "3px",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = colors.panelAlt;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = colors.panel;
+            }}
+          >
+            {/* Three vertical lines */}
+            <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
+            <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
+            <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
+          </div>
 
-          {hasTranscript && (
+          {/* Panel (slides in/out) */}
+          {showPromptPanel && (
             <div
               style={{
-                marginTop: 12,
-                padding: 12,
-                borderRadius: 8,
-                border: `1px solid ${colors.border}`,
-                background: colors.panelAlt,
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
+                position: "fixed",
+                right: 0,
+                top: 0,
+                width: "400px",
+                height: "100vh",
+                background: colors.panel,
+                borderLeft: `1px solid ${colors.border}`,
+                padding: "20px",
+                overflowY: "auto",
+                zIndex: 1000,
+                boxShadow: "-4px 0 12px rgba(0,0,0,0.3)",
+                animation: "slideIn 0.3s ease",
               }}
             >
-              <div style={{ fontSize: 14, color: colors.muted, marginBottom: 4 }}>
-                Edit your transcript below, then press <b>Send to Bot</b>.
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Prompt Inspector</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowPromptPanel(false)}>
+                  ✕ Close
+                </Button>
               </div>
 
-              <Textarea
-                label="Transcript"
-                rows={4}
-                value={transcript}
-                onChange={(e) => setTranscript(e.target.value)}
-              />
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setHasTranscript(false);
-                    setTranscript("");
+              {/* System Prompt Section */}
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+                  System Prompt
+                </label>
+                <Textarea
+                  rows={12}
+                  value={systemPrompt || "No prompt sent yet..."}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  style={{ 
+                    fontFamily: "monospace", 
+                    fontSize: 12,
+                    background: colors.panelAlt,
                   }}
-                >
-                  Discard
-                </Button>
+                />
+                <div style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                  This is the system message sent to the AI
+                </div>
+              </div>
 
-                <Button size="sm" onClick={sendTranscriptToBot}>
-                  Send to Bot
-                </Button>
+              {/* Last User Message */}
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+                  Last User Message
+                </label>
+                <Textarea
+                  rows={4}
+                  value={lastPromptSent || "No message sent yet..."}
+                  readOnly
+                  style={{ 
+                    fontFamily: "monospace", 
+                    fontSize: 12,
+                    background: colors.panelAlt,
+                    opacity: 0.8,
+                  }}
+                />
+              </div>
+
+              {/* Quick Override Section */}
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+                  Quick Override
+                </label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <Input
+                    label="Bot Name"
+                    value={form.agent2.name}
+                    onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))}
+                  />
+                  <Textarea
+                    label="Personality Override"
+                    rows={6}
+                    value={form.agent2.persona}
+                    onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
+                  />
+                </div>
+              </div>
+
+              {/* Apply Button */}
+              <Button
+                onClick={async () => {
+                  try {
+                    const payload = {
+                      model: form.model,
+                      topic: form.topic,
+                      rules: form.rules,
+                      bot: {
+                        name: form.agent2.name,
+                        personality: form.agent2.persona,
+                        goal: form.agent2.stance,
+                      },
+                    };
+
+                    const res = await fetch(SETTINGS_URL, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    });
+
+                    if (!res.ok) {
+                      throw new Error(`Failed to update settings (status ${res.status})`);
+                    }
+
+                    console.log("Prompt settings updated");
+                    alert("Prompt settings applied!");
+                  } catch (err) {
+                    console.error("Error updating settings:", err);
+                    setError("Failed to apply prompt changes");
+                  }
+                }}
+                style={{ width: "100%" }}
+              >
+                Apply Prompt Changes
+              </Button>
+
+              <div style={{ fontSize: 11, color: colors.muted, marginTop: 8, textAlign: "center" }}>
+                Changes will apply to the next message
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Modal
-        open={openSettings}
-        onClose={() => setOpenSettings(false)}
-        title="Conversation Settings"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setOpenSettings(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                setOpenSettings(false);
-                try {
-                  const payload = {
-                    model: form.model,
-                    topic: form.topic,
-                    rules: form.rules,
-                    bot: {
-                      name: form.agent2.name,
-                      personality: form.agent2.persona,
-                      goal: form.agent2.stance,
-                    },
-                  };
-
-                  const res = await fetch(SETTINGS_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                  });
-
-                  if (!res.ok) {
-                    throw new Error(`Failed to update settings (status ${res.status})`);
-                  }
-
-                  console.log("Settings updated successfully:", payload);
-                } catch (err) {
-                  console.error("Error updating settings:", err);
-                  setError("Failed to save settings");
-                }
-              }}
-            >
-              Save
-            </Button>
-          </>
-        }
-      >
-        {/* Model */}
-        <div style={{ marginBottom: 12 }}>
-          <Input
-            label="Model"
-            value={form.model}
-            onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-          />
-        </div>
-
-        {/* Topic */}
-        <div style={{ marginBottom: 12 }}>
-          <Input
-            label="Topic"
-            value={form.topic}
-            onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))}
-          />
-        </div>
-
-        {/* Rules */}
-        <div style={{ marginBottom: 12 }}>
-          <Textarea
-            label="Rules"
-            rows={6}
-            value={form.rules}
-            onChange={(e) => setForm((f) => ({ ...f, rules: e.target.value }))}
-          />
-        </div>
-
-        {/* Bot Settings */}
-        <div style={{ marginTop: 20 }}>
-          <h4 style={{ marginBottom: 8 }}>Bot Configuration</h4>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <Input
-              label="Bot Name"
-              value={form.agent2.name}
-              onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))}
-            />
-            <Textarea
-              label="Bot Persona"
-              rows={5}
-              value={form.agent2.persona}
-              onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
-            />
-            <Textarea
-              label="Bot Goal / Stance"
-              rows={2}
-              value={form.agent2.stance}
-              onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))}
-            />
-          </div>
-        </div>
-      </Modal>
-      {/* Prompt Inspector Side Panel with Tab */}
-      <>
-        {/* Overlay to close panel when clicking outside */}
-        {showPromptPanel && (
-          <div
-            onClick={() => setShowPromptPanel(false)}
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              background: "rgba(0, 0, 0, 0.3)",
-              zIndex: 999,
-            }}
-          />
-        )}
-        {/* Tab (always visible) */}
-        <div
-          onClick={() => setShowPromptPanel((v) => !v)}
-          style={{
-            position: "fixed",
-            right: showPromptPanel ? "400px" : "0",
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: "20px",
-            height: "120px",
-            background: colors.panel,
-            border: `1px solid ${colors.border}`,
-            borderRight: showPromptPanel ? `1px solid ${colors.border}` : "none",
-            borderTopLeftRadius: "8px",
-            borderBottomLeftRadius: "8px",
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            zIndex: 1001,
-            boxShadow: "-2px 0 8px rgba(0,0,0,0.2)",
-            transition: "right 0.3s ease",
-            gap: "3px",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = colors.panelAlt;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = colors.panel;
-          }}
-        >
-          {/* Three vertical lines */}
-          <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
-          <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
-          <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
-        </div>
-
-        {/* Panel (slides in/out) */}
-        {showPromptPanel && (
-          <div
-            style={{
-              position: "fixed",
-              right: 0,
-              top: 0,
-              width: "400px",
-              height: "100vh",
-              background: colors.panel,
-              borderLeft: `1px solid ${colors.border}`,
-              padding: "20px",
-              overflowY: "auto",
-              zIndex: 1000,
-              boxShadow: "-4px 0 12px rgba(0,0,0,0.3)",
-              animation: "slideIn 0.3s ease",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Prompt Inspector</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowPromptPanel(false)}>
-                ✕ Close
-              </Button>
-            </div>
-
-            {/* System Prompt Section */}
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
-                System Prompt
-              </label>
-              <Textarea
-                rows={12}
-                value={systemPrompt || "No prompt sent yet..."}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                style={{ 
-                  fontFamily: "monospace", 
-                  fontSize: 12,
-                  background: colors.panelAlt,
-                }}
-              />
-              <div style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
-                This is the system message sent to the AI
-              </div>
-            </div>
-
-            {/* Last User Message */}
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
-                Last User Message
-              </label>
-              <Textarea
-                rows={4}
-                value={lastPromptSent || "No message sent yet..."}
-                readOnly
-                style={{ 
-                  fontFamily: "monospace", 
-                  fontSize: 12,
-                  background: colors.panelAlt,
-                  opacity: 0.8,
-                }}
-              />
-            </div>
-
-            {/* Quick Override Section */}
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
-                Quick Override
-              </label>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <Input
-                  label="Bot Name"
-                  value={form.agent2.name}
-                  onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))}
-                />
-                <Textarea
-                  label="Personality Override"
-                  rows={6}
-                  value={form.agent2.persona}
-                  onChange={(e) => setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))}
-                />
-              </div>
-            </div>
-
-            {/* Apply Button */}
-            <Button
-              onClick={async () => {
-                try {
-                  const payload = {
-                    model: form.model,
-                    topic: form.topic,
-                    rules: form.rules,
-                    bot: {
-                      name: form.agent2.name,
-                      personality: form.agent2.persona,
-                      goal: form.agent2.stance,
-                    },
-                  };
-
-                  const res = await fetch(SETTINGS_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                  });
-
-                  if (!res.ok) {
-                    throw new Error(`Failed to update settings (status ${res.status})`);
-                  }
-
-                  console.log("Prompt settings updated");
-                  alert("Prompt settings applied!");
-                } catch (err) {
-                  console.error("Error updating settings:", err);
-                  setError("Failed to apply prompt changes");
-                }
-              }}
-              style={{ width: "100%" }}
-            >
-              Apply Prompt Changes
-            </Button>
-
-            <div style={{ fontSize: 11, color: colors.muted, marginTop: 8, textAlign: "center" }}>
-              Changes will apply to the next message
-            </div>
-          </div>
-        )}
-      </>
-    </div>
+        </>
+      </div>
+    </>  
   );
 }
