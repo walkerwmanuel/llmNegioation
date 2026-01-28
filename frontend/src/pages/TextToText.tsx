@@ -307,7 +307,7 @@ export default function TextToText() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    setLastPromptSent(`Resuming from existing transcript:\n${transcript.substring(0, 200)}...`);
+    setLastPromptSent(`Resuming from existing transcript:\n${transcript}`);
   
     try {
       await postStream(
@@ -354,7 +354,7 @@ export default function TextToText() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    setLastPromptSent(`Re-running from edited message:\n${transcript.substring(0, 200)}...`);
+    setLastPromptSent(`Re-running from edited message:\n${transcript}`);
 
     try {
       await postStream(
@@ -711,11 +711,13 @@ export default function TextToText() {
           rows={6}
           value={lastPromptSent || "No messages sent yet..."}
           readOnly
+          onChange={() => {}}
           style={{ 
             fontFamily: "monospace", 
             fontSize: 11,
             background: colors.panelAlt,
             opacity: 0.8,
+            resize: "vertical",
           }}
         />
       </div>
