@@ -5,18 +5,19 @@ import React, { useEffect, useState } from "react";
 function Avatar({
   name,
   isSpeaking,
-  badge,
+  tone,
 }: {
   name: string;
   isSpeaking: boolean;
-  badge: string;
+  tone: Tone;
 }) {
   const safeName = typeof name === "string" && name.trim() ? name.trim() : "agent";
-  const src = `https://api.dicebear.com/6.x/adventurer/svg?seed=${encodeURIComponent(safeName)}`;
+  const style = styleForTone(tone);
+
+  const src = `https://api.dicebear.com/6.x/${style}/svg?seed=${encodeURIComponent(safeName)}`;
 
   return (
     <div style={{ position: "relative", width: 48, height: 48, flex: "0 0 auto" }}>
-      {/* speaking ring */}
       <div
         style={{
           position: "absolute",
@@ -33,7 +34,7 @@ function Avatar({
       <img
         src={src}
         alt={`${safeName} avatar`}
-        title={safeName}
+        title={`${safeName} (${tone})`}
         width={48}
         height={48}
         onError={(e) => {
@@ -50,28 +51,6 @@ function Avatar({
         }}
       />
 
-      {/* emotion badge */}
-      <div
-        title="tone"
-        style={{
-          position: "absolute",
-          right: -3,
-          bottom: -3,
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          border: `1px solid ${colors.border}`,
-          background: colors.panel,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 12,
-        }}
-      >
-        {badge}
-      </div>
-
-      {/* keyframes */}
       <style>
         {`
           @keyframes pulse {
@@ -85,12 +64,38 @@ function Avatar({
   );
 }
 
-const toneBadge = (text: string) => {
+type Tone = "cooperate" | "assert" | "explore" | "concern" | "evidence" | "unsure" | "neutral";
+
+const toneFromText = (text: string): Tone => {
   const t = (text || "").toLowerCase();
-  if (/(agree|aligned|compromise|common ground|fair|mutual)/.test(t)) return "🤝";
-  if (/(must|can’t|cannot|won’t|no |not acceptable|refuse|insist)/.test(t)) return "😠";
-  if (/(maybe|consider|could|suggest|proposal|option)/.test(t)) return "🙂";
-  return "😐";
+
+  if (/(agree|aligned|compromise|common ground|fair|mutual|together|both|consensus)/.test(t)) return "cooperate";
+  if (/(must|can’t|cannot|won’t|no |not acceptable|refuse|insist|nonnegotiable|absolutely not)/.test(t)) return "assert";
+  if (/(maybe|consider|could|suggest|proposal|option|what if|perhaps|might)/.test(t)) return "explore";
+  if (/(risk|concern|worry|problem|issue|harm|danger)/.test(t)) return "concern";
+  if (/(evidence|data|research|studies show|proven|clearly)/.test(t)) return "evidence";
+  if (/(unsure|uncertain|depends|unclear|hard to say)/.test(t)) return "unsure";
+
+  return "neutral";
+};
+
+const styleForTone = (tone: Tone) => {
+  switch (tone) {
+    case "cooperate":
+      return "adventurer";     // friendly
+    case "assert":
+      return "bottts";         // sharper / more “intense”
+    case "explore":
+      return "notionists";     // thoughtful / quirky
+    case "concern":
+      return "micah";          // more serious
+    case "evidence":
+      return "avataaars";      // “professional” vibe
+    case "unsure":
+      return "pixel-art";      // playful uncertainty
+    default:
+      return "adventurer";
+  }
 };
 
 export default function ChatBubble({
@@ -137,7 +142,7 @@ export default function ChatBubble({
         width: "100%",
       }}
     >
-      {side === "left" && <Avatar name={name} isSpeaking={isSpeaking} badge={toneBadge(content)} />}
+      {side === "left" && <Avatar name={name} isSpeaking={isSpeaking} tone={toneFromText(content)} />}
 
       <div
         style={{
@@ -212,7 +217,7 @@ export default function ChatBubble({
         )}
       </div>
 
-      {side === "right" && <Avatar name={name} isSpeaking={isSpeaking} badge={toneBadge(content)} />}
+      {side === "right" &&  <Avatar name={name} isSpeaking={isSpeaking} tone={toneFromText(content)} />}
     </div>
   );
 }
