@@ -1,11 +1,11 @@
 import sqlite3
 import os
 
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'debates.db')
+DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'negotiations.db')
 
 
 def get_db_connection():
-    """Returns a SQLite connection to debates.db"""
+    """Returns a SQLite connection to negotiations.db"""
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -28,13 +28,13 @@ def init_db():
         )
     ''')
 
-    # Create debates table
+    # Create negotiations table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS debates (
+        CREATE TABLE IF NOT EXISTS negotiations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER REFERENCES users(id),
             topic TEXT NOT NULL,
-            debate_type TEXT NOT NULL,
+            negotiation_type TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -44,7 +44,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            debate_id INTEGER REFERENCES debates(id) ON DELETE CASCADE,
+            negotiation_id INTEGER REFERENCES negotiations(id) ON DELETE CASCADE,
             role TEXT NOT NULL,
             content TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
