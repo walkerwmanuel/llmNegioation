@@ -136,9 +136,10 @@ export default function SpeechToText() {
     setError(null);
   };
 
-  const TRANSCRIBE_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/transcribe";
-  const RESPOND_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/respond";
-  const SETTINGS_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/update-settings";
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const TRANSCRIBE_URL = `${API_BASE}/speech-to-text/transcribe`;
+  const RESPOND_URL = `${API_BASE}/speech-to-text/respond`;
+  const SETTINGS_URL = `${API_BASE}/speech-to-text/update-settings`;
 
 
   // Auto-scroll chat

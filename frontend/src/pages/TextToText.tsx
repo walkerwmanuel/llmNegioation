@@ -35,7 +35,8 @@ type ChatItem =
       prevContent?: string;
     };
 
-const API_URL = "https://bag-vii-yang-concert.trycloudflare.com/t2t-negotiate";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = `${API_BASE}/t2t-negotiate`;
 
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
