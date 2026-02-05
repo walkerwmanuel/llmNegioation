@@ -10,6 +10,9 @@ import ChatBubble from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
 import DownloadChatButton from "../components/ui/DownloadChatButton";
+import { NegotiationLayout } from "../components/layout/NegotiationLayout";
+import { useNegotiationSession } from "../hooks/useNegotiationSession";
+import { useAuth } from "../context/AuthContext";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -110,6 +113,28 @@ export default function SpeechToText() {
   const timerRef = useRef<number | null>(null);
   const maxTimeoutRef = useRef<number | null>(null);
   const [sendingToBot, setSendingToBot] = useState(false);
+
+  // Negotiation session hook for persistence
+  const { isAuthenticated } = useAuth();
+  const {
+    currentNegotiationId,
+    startNewNegotiation,
+    loadNegotiation,
+    saveMessage,
+    clearSession,
+  } = useNegotiationSession();
+
+  // Handle selecting a negotiation from sidebar
+  const handleSelectNegotiation = async (id: number) => {
+    await loadNegotiation(id);
+  };
+
+  // Handle new negotiation from sidebar
+  const handleNewNegotiation = () => {
+    clearSession();
+    setMessages([]);
+    setError(null);
+  };
 
   const TRANSCRIBE_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/transcribe";
   const RESPOND_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/respond";
@@ -440,6 +465,16 @@ export default function SpeechToText() {
         { speaker: form.agent2.name, content: data.bot, side: "right" },
       ]);
 
+      // Save messages to backend if authenticated
+      if (isAuthenticated) {
+        // Start a new negotiation if we don't have one
+        if (!currentNegotiationId) {
+          await startNewNegotiation(form.topic, 'user_vs_ai');
+        }
+        await saveMessage('user', data.you);
+        await saveMessage('ai_1', data.bot);
+      }
+
       // Clear the edit box
       setTranscript("");
       setHasTranscript(false);
@@ -460,13 +495,17 @@ export default function SpeechToText() {
 
 
   return (
-    <>
+    <NegotiationLayout
+      onSelectNegotiation={handleSelectNegotiation}
+      selectedId={currentNegotiationId}
+      onNewNegotiation={handleNewNegotiation}
+    >
       <style>{spinnerKeyframes}</style>
       <div
         style={{
-          width: "90vw",
-          height: "90vh",
-          margin: "5vh auto",
+          width: "100%",
+          height: "100%",
+          padding: "20px",
           display: "flex",
           flexDirection: "column",
           color: colors.text,
@@ -985,6 +1024,6 @@ export default function SpeechToText() {
           )}
         </>
       </div>
-    </>  
+    </NegotiationLayout>
   );
 }
