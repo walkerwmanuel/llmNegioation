@@ -65,15 +65,17 @@ export function ChatHistorySidebar({
       <div style={{ padding: '12px' }}>
         <button
           onClick={onNewNegotiation}
+          disabled={isLoading}
           style={{
             width: '100%',
             padding: '10px',
-            background: '#4285f4',
+            background: isLoading ? '#666' : '#4285f4',
             color: 'white',
             border: 'none',
             borderRadius: '8px',
-            cursor: 'pointer',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
             fontWeight: 600,
+            opacity: isLoading ? 0.7 : 1,
           }}
         >
           + New Negotiation
@@ -86,8 +88,44 @@ export function ChatHistorySidebar({
             Sign in to see your negotiation history
           </div>
         ) : isLoading ? (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
-            Loading...
+          <div style={{ padding: '8px 0' }}>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                style={{
+                  padding: '12px',
+                  marginBottom: '4px',
+                  borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.05)',
+                }}
+              >
+                <div
+                  style={{
+                    height: '14px',
+                    width: '80%',
+                    background: 'rgba(255,255,255,0.1)',
+                    borderRadius: '4px',
+                    marginBottom: '8px',
+                    animation: 'pulse 1.5s ease-in-out infinite',
+                  }}
+                />
+                <div
+                  style={{
+                    height: '10px',
+                    width: '40%',
+                    background: 'rgba(255,255,255,0.08)',
+                    borderRadius: '4px',
+                    animation: 'pulse 1.5s ease-in-out infinite',
+                  }}
+                />
+              </div>
+            ))}
+            <style>{`
+              @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+              }
+            `}</style>
           </div>
         ) : negotiations.length === 0 ? (
           <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
