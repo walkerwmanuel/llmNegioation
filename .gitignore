@@ -2,3 +2,7 @@ backend/venv
 backend/.env
 */**/__pycache__
 backend/.venv
+prd.json
+progress.txt
+PROMPT.md
+RALPH_SETUP_GUIDE.md
