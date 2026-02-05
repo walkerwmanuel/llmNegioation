@@ -10,6 +10,9 @@ import ChatBubble from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
 import DownloadChatButton from "../components/ui/DownloadChatButton";
+import { NegotiationLayout } from "../components/layout/NegotiationLayout";
+import { useNegotiationSession } from "../hooks/useNegotiationSession";
+import { useAuth } from "../context/AuthContext";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -171,6 +174,16 @@ export default function TextToText() {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [lastPromptSent, setLastPromptSent] = useState("");
 
+  // Negotiation session hook for persistence
+  const { isAuthenticated } = useAuth();
+  const {
+    currentNegotiationId,
+    startNewNegotiation,
+    loadNegotiation,
+    saveMessage,
+    clearSession,
+  } = useNegotiationSession();
+
   useEffect(() => {
     if (!stickToBottom) return;
     const el = chatRef.current;
@@ -250,6 +263,11 @@ export default function TextToText() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
+    // Start a new negotiation in the backend if authenticated
+    if (isAuthenticated) {
+      await startNewNegotiation(form.topic, 'ai_vs_ai');
+    }
+
     // Build the system prompt for display
     const currentSystemPrompt = `NEGOTIATION TOPIC: ${form.topic}
 
@@ -268,17 +286,20 @@ export default function TextToText() {
   Rounds: ${form.rounds}`;
 
     setSystemPrompt(currentSystemPrompt);
-    setLastPromptSent("Starting new negotiation (no existing transcript)");  
+    setLastPromptSent("Starting new negotiation (no existing transcript)");
 
     try {
       await postStream(
         API_URL,
         buildPayload({ transcript: "", form }),
-        (msg) => {
+        async (msg) => {
           if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
           if (msg.type === "turn") {
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
+            // Save message to backend
+            const role = side === "left" ? "ai_1" : "ai_2";
+            await saveMessage(role, msg.content);
           }
         },
         controller.signal
@@ -289,6 +310,20 @@ export default function TextToText() {
       setLoading(false);
       controllerRef.current = null;
     }
+  };
+
+  // Handle selecting a negotiation from sidebar
+  const handleSelectNegotiation = async (id: number) => {
+    await loadNegotiation(id);
+    // Note: In a full implementation, we'd load and display the messages
+    // For now, this sets the current negotiation context
+  };
+
+  // Handle new negotiation from sidebar
+  const handleNewNegotiation = () => {
+    clearSession();
+    setMessages([]);
+    setErr(null);
   };
 
   const onPause = () => {
@@ -378,7 +413,12 @@ export default function TextToText() {
   };
 
   return (
-    <div style={{ width: "90vw", height: "90vh", margin: "5vh auto", color: colors.text, display: "flex", flexDirection: "column" }}>
+    <NegotiationLayout
+      onSelectNegotiation={handleSelectNegotiation}
+      selectedId={currentNegotiationId}
+      onNewNegotiation={handleNewNegotiation}
+    >
+    <div style={{ width: "100%", height: "100%", padding: "20px", color: colors.text, display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Bot–Bot Negotiation</h2>
         <div style={{ display: "flex", gap: 8 }}>
@@ -800,5 +840,6 @@ Rounds: ${form.rounds}`;
   )}
 </>
 </div>
+    </NegotiationLayout>
   );
 }
