@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { createNegotiation, getNegotiation, addMessage } from '../api/negotiations';
-import { Message, NegotiationWithMessages } from '../types/negotiation';
+import type { Message, NegotiationWithMessages } from '../types/negotiation';
 
 export function useNegotiationSession() {
   const { isAuthenticated } = useAuth();

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getNegotiations, deleteNegotiation } from '../../api/negotiations';
-import { Negotiation } from '../../types/negotiation';
+import type { Negotiation } from '../../types/negotiation';
 import { NegotiationListItem } from './NegotiationListItem';
 
 interface ChatHistorySidebarProps {

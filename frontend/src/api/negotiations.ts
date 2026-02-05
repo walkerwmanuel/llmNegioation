@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { Negotiation, NegotiationWithMessages, Message } from '../types/negotiation';
+import type { Negotiation, NegotiationWithMessages, Message } from '../types/negotiation';
 
 export async function getNegotiations(): Promise<Negotiation[]> {
   const response = await apiClient.get<{ negotiations: Negotiation[] }>('/api/negotiations');

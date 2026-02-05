@@ -1,4 +1,4 @@
-import { Negotiation } from '../../types/negotiation';
+import type { Negotiation } from '../../types/negotiation';
 
 interface NegotiationListItemProps {
   negotiation: Negotiation;
