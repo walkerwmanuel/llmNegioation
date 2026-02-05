@@ -18,22 +18,26 @@ export function ChatHistorySidebar({
   const { isAuthenticated } = useAuth();
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadNegotiations();
     } else {
       setNegotiations([]);
+      setError(null);
     }
   }, [isAuthenticated]);
 
   const loadNegotiations = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const data = await getNegotiations();
       setNegotiations(data);
-    } catch (error) {
-      console.error('Failed to load negotiations:', error);
+    } catch (err) {
+      console.error('Failed to load negotiations:', err);
+      setError('Failed to load history');
     } finally {
       setIsLoading(false);
     }
@@ -46,8 +50,9 @@ export function ChatHistorySidebar({
       if (selectedId === id) {
         onNewNegotiation();
       }
-    } catch (error) {
-      console.error('Failed to delete negotiation:', error);
+    } catch (err) {
+      console.error('Failed to delete negotiation:', err);
+      alert('Failed to delete negotiation. Please try again.');
     }
   };
 
@@ -86,6 +91,23 @@ export function ChatHistorySidebar({
         {!isAuthenticated ? (
           <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
             Sign in to see your negotiation history
+          </div>
+        ) : error ? (
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ color: '#f87171', marginBottom: '12px' }}>{error}</div>
+            <button
+              onClick={loadNegotiations}
+              style={{
+                padding: '8px 16px',
+                background: 'transparent',
+                color: '#4285f4',
+                border: '1px solid #4285f4',
+                borderRadius: '6px',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
           </div>
         ) : isLoading ? (
           <div style={{ padding: '8px 0' }}>
