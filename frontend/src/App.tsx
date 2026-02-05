@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import Home from "./pages/home";
 import TextToText from "./pages/TextToText";
 import SpeechToText from "./pages/SpeechToText";
+import { AuthButton } from "./components/auth/AuthButton";
 
 export default function App() {
   return (
@@ -49,8 +50,8 @@ export default function App() {
             Cross-Cultural Negotiation System
           </h1>
 
-          {/* Spacer to balance flex layout */}
-          <div style={{ width: "70px" }} />
+          {/* Auth button in top-right */}
+          <AuthButton />
         </div>
 
         <p style={{ margin: 0, fontSize: "1rem", opacity: 0.9 }}>
