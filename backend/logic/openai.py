@@ -8,9 +8,9 @@ class Agent(BaseModel):
     name: str
     personality: str
     goal: str
+    model: str
 
 def runSimpleNegotiate(
-    model: str,
     agent1: Agent,
     agent2: Agent,
     topic: str,
@@ -53,7 +53,7 @@ def runSimpleNegotiate(
     for r in range(next_round, target_total + 1):
         if pending_b and r == resume_round:
             yield (json.dumps({"type": "round", "round": r, "resume": True}) + "\n").encode("utf-8")
-            b = _agent_turn(model, agent2, topic, transcript, rules)
+            b = _agent_turn(agent2, topic, transcript, rules)
             transcript += ("" if transcript.endswith("\n") else "\n") + f"{agent2.name}:\n{b}\n\n"
             yield (json.dumps({
                 "type": "turn",
@@ -69,7 +69,7 @@ def runSimpleNegotiate(
         transcript += f"=== Round {r} ===\n\n"
         yield (json.dumps({"type": "round", "round": r}) + "\n").encode("utf-8")
 
-        a = _agent_turn(model, agent1, topic, transcript, rules)
+        a = _agent_turn(agent1, topic, transcript, rules)
         transcript += f"{agent1.name}:\n{a}\n\n"
         yield (json.dumps({
             "type": "turn",
@@ -78,7 +78,7 @@ def runSimpleNegotiate(
             "content": a,
         }) + "\n").encode("utf-8")
 
-        b = _agent_turn(model, agent2, topic, transcript, rules)
+        b = _agent_turn(agent2, topic, transcript, rules)
         transcript += f"{agent2.name}:\n{b}\n\n"
         yield (json.dumps({
             "type": "turn",
@@ -90,7 +90,6 @@ def runSimpleNegotiate(
     yield (json.dumps({"type": "done", "transcript": transcript.strip()}) + "\n").encode("utf-8")
 
 def _agent_turn(
-    model: str,
     agent: Agent,
     topic: str,
     transcript_so_far: str,
@@ -106,4 +105,4 @@ def _agent_turn(
         f"{transcript_so_far or '[start of negotiation]'}\n\n"
         f"{agent.name}:"
     )
-    return get_openai_response(model, prompt)
+    return get_openai_response(agent.model, prompt)

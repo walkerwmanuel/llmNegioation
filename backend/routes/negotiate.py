@@ -10,20 +10,19 @@ class Agent(BaseModel):
     name: str
     personality: str
     goal: str
+    model: str
 
 class NegotiateRequest(BaseModel):
-    model: str
     agent1: Agent
     agent2: Agent
     topic: str
     rules: str
     rounds: int = 2
-    existing_transcript: str
+    existing_transcript: str = ""
 
 @router.post("/t2t-negotiate")
 def negotiate_endpoint(req: NegotiateRequest):
     gen = runSimpleNegotiate(
-        model=req.model,
         agent1=req.agent1,
         agent2=req.agent2,
         topic=req.topic,

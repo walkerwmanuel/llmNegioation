@@ -11,8 +11,9 @@ import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
 import DownloadChatButton from "../components/ui/DownloadChatButton";
 
-type Agent = { name: string; persona: string; stance: string };
+type Agent = { name: string; persona: string; stance: string; model: string };
 type FormState = {
+  // keep form.model only if you still want a global default; otherwise remove it
   model: string;
   topic: string;
   rules: string;
@@ -20,6 +21,7 @@ type FormState = {
   agent1: Agent;
   agent2: Agent;
 };
+
 
 type ChatItem =
   | { kind: "round"; round: number }
@@ -37,14 +39,24 @@ const API_URL = "https://bag-vii-yang-concert.trycloudflare.com/t2t-negotiate";
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
   return {
+    model: form.agent1.model,
     existing_transcript: transcript,
-    model: form.model,
     topic: form.topic,
     rules: form.rules,
     rounds: form.rounds,
-    agent1: { name: form.agent1.name, personality: form.agent1.persona, goal: form.agent1.stance },
-    agent2: { name: form.agent2.name, personality: form.agent2.persona, goal: form.agent2.stance },
-  };
+    agent1: {
+      name: form.agent1.name,
+      personality: form.agent1.persona,
+      goal: form.agent1.stance,
+      model: form.agent1.model,
+    },
+    agent2: {
+      name: form.agent2.name,
+      personality: form.agent2.persona,
+      goal: form.agent2.stance,
+      model: form.agent2.model,
+    },
+  };  
 }
 
 function serializeTranscript(items: ChatItem[]): string {
@@ -142,11 +154,13 @@ export default function TextToText() {
         "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn.\n2) Address the topic directly; cite concrete practices, examples, or trade-offs.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) If referencing evidence, summarize briefly rather than citing sources.",
       rounds: 4,
       agent1: {
+        model: "gpt-4o-mini",
         name: "Dr. Carter",
         persona: "You are Dr. Emily Carter, a 45-year-old Caucasian female social scientist with a Ph.D. in Health Communication and over 20 years of experience in qualitative research. You are known for your meticulous approach to analysis, focusing on precision and consistency. As you analyze the data, ensure that each element is carefully examined and categorized. Pay close attention to the details, and make decisions based on thorough reasoning. Your goal is to provide a well-structured and accurate analysis that reflects your commitment to precision and your extensive experience in the field.",
         stance: "Negotiate for as little phone useage as possible.",
       },
       agent2: {
+        model: "gpt-4o-mini",
         name: "Dr. Rodriguez",
         persona: "You are Dr. Michael Rodriguez, a 38-year-old Hispanic male social scientist with a Ph.D. in Sociology and 15 years of experience in analyzing social dynamics and health narratives. You are known for your intuitive and empathetic approach to research, focusing on the emotional tone and social context. As you analyze the data, consider the broader implications and the underlying human experiences. Your goal is to capture the nuances and emotional depth of the data, reflecting your understanding of the social dynamics and your commitment to empathy and insight.",
         stance: "Negotiate for as much phone usage as possible.",
@@ -264,7 +278,9 @@ export default function TextToText() {
   Persona: ${form.agent2.persona}
   Goal/Stance: ${form.agent2.stance}
 
-  Model: ${form.model}
+  Agent 1 Model: ${form.agent1.model}
+  Agent 2 Model: ${form.agent2.model}
+
   Rounds: ${form.rounds}`;
 
     setSystemPrompt(currentSystemPrompt);
@@ -539,69 +555,152 @@ export default function TextToText() {
     </>
   }
 >
-  {/* Model + Rounds */}
-  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-  <div>
-  <label style={{ fontSize: 12, color: colors.muted }}>Model</label>
-  <select
-    value={form.model}
-    onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))}
-    style={{
-      width: "100%",
-      marginTop: 4,
-      padding: "8px 10px",
-      borderRadius: 6,
-      border: `1px solid ${colors.border}`,
-      background: colors.panelAlt,
-      color: colors.text,
-    }}
-  >
-    <option value="gpt-4o-mini">gpt-4o-mini</option>
-    <option value="gpt-4o">gpt-4o</option>
-    <option value="gpt-5-nano">gpt-5-nano</option>
-    <option value="gpt-5-mini">gpt-5-mini</option>
-    <option value="gpt-5.2">gpt-5.2</option>
-  </select>
+
+
+{/* Rounds */}
+<div style={{ marginTop: 0 }}>
+  <Input
+    label="Rounds"
+    type="number"
+    min={1}
+    max={20}
+    value={form.rounds}
+    onChange={(e) =>
+      setForm((f) => ({
+        ...f,
+        rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)),
+      }))
+    }
+  />
 </div>
 
+{/* Topic */}
+<div style={{ marginTop: 12 }}>
+  <Input
+    label="Topic"
+    value={form.topic}
+    onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))}
+  />
+</div>
+
+{/* Rules */}
+<div style={{ marginTop: 12 }}>
+  <Textarea
+    label="Rules"
+    rows={6}
+    value={form.rules}
+    onChange={(e) => setForm((f) => ({ ...f, rules: e.target.value }))}
+  />
+</div>
+
+{/* Agents */}
+<div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+  {/* Agent A */}
+  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <h4>Agent A</h4>
+
+    <div>
+      <label style={{ fontSize: 12, color: colors.muted }}>Model</label>
+      <select
+        value={form.agent1.model}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, agent1: { ...f.agent1, model: e.target.value } }))
+        }
+        style={{
+          width: "100%",
+          marginTop: 4,
+          padding: "8px 10px",
+          borderRadius: 6,
+          border: `1px solid ${colors.border}`,
+          background: colors.panelAlt,
+          color: colors.text,
+        }}
+      >
+        <option value="gpt-4o-mini">gpt-4o-mini</option>
+        <option value="gpt-4o">gpt-4o</option>
+        <option value="gpt-5-nano">gpt-5-nano</option>
+        <option value="gpt-5-mini">gpt-5-mini</option>
+        <option value="gpt-5.2">gpt-5.2</option>
+      </select>
+    </div>
+
     <Input
-      label="Rounds"
-      type="number"
-      min={1}
-      max={20}
-      value={form.rounds}
-      onChange={(e) => setForm(f => ({ ...f, rounds: Math.max(1, Math.min(20, Number(e.target.value) || 1)) }))}
+      label="Name"
+      value={form.agent1.name}
+      onChange={(e) =>
+        setForm((f) => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))
+      }
     />
-  </div> 
-
-  {/* Topic */}
-  <div style={{ marginTop: 12 }}>
-    <Input label="Topic" value={form.topic} onChange={(e) => setForm(f => ({ ...f, topic: e.target.value }))} />
+    <Textarea
+      label="Persona"
+      value={form.agent1.persona}
+      onChange={(e) =>
+        setForm((f) => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))
+      }
+    />
+    <Textarea
+      label="Goal / Stance"
+      value={form.agent1.stance}
+      onChange={(e) =>
+        setForm((f) => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))
+      }
+    />
   </div>
 
-  {/* Rules */}
-  <div style={{ marginTop: 12 }}>
-    <Textarea label="Rules" rows={6} value={form.rules} onChange={(e) => setForm(f => ({ ...f, rules: e.target.value }))} />
-  </div>
+  {/* Agent B */}
+  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <h4>Agent B</h4>
 
-  {/* Agents */}
-  <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-    {/* Agent A */}
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <h4>Agent A</h4>
-      <Input label="Name" value={form.agent1.name} onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, name: e.target.value } }))} />
-      <Textarea label="Persona" value={form.agent1.persona} onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, persona: e.target.value } }))} />
-      <Textarea label="Goal / Stance" value={form.agent1.stance} onChange={(e) => setForm(f => ({ ...f, agent1: { ...f.agent1, stance: e.target.value } }))} />
+    <div>
+      <label style={{ fontSize: 12, color: colors.muted }}>Model</label>
+      <select
+        value={form.agent2.model}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, agent2: { ...f.agent2, model: e.target.value } }))
+        }
+        style={{
+          width: "100%",
+          marginTop: 4,
+          padding: "8px 10px",
+          borderRadius: 6,
+          border: `1px solid ${colors.border}`,
+          background: colors.panelAlt,
+          color: colors.text,
+        }}
+      >
+        <option value="gpt-4o-mini">gpt-4o-mini</option>
+        <option value="gpt-4o">gpt-4o</option>
+        <option value="gpt-5-nano">gpt-5-nano</option>
+        <option value="gpt-5-mini">gpt-5-mini</option>
+        <option value="gpt-5.2">gpt-5.2</option>
+      </select>
     </div>
 
-    {/* Agent B */}
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <h4>Agent B</h4>
-      <Input label="Name" value={form.agent2.name} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))} />
-      <Textarea label="Persona" value={form.agent2.persona} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))} />
-      <Textarea label="Goal / Stance" value={form.agent2.stance} onChange={(e) => setForm(f => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))} />
-    </div>
+    <Input
+      label="Name"
+      value={form.agent2.name}
+      onChange={(e) =>
+        setForm((f) => ({ ...f, agent2: { ...f.agent2, name: e.target.value } }))
+      }
+    />
+    <Textarea
+      label="Persona"
+      value={form.agent2.persona}
+      onChange={(e) =>
+        setForm((f) => ({ ...f, agent2: { ...f.agent2, persona: e.target.value } }))
+      }
+    />
+    <Textarea
+      label="Goal / Stance"
+      value={form.agent2.stance}
+      onChange={(e) =>
+        setForm((f) => ({ ...f, agent2: { ...f.agent2, stance: e.target.value } }))
+      }
+    />
   </div>
+</div>
+
+
 </Modal>
 {/* Prompt Inspector Side Panel with Tab */}
 <>
@@ -782,7 +881,9 @@ AGENT 2 - ${form.agent2.name}:
 Persona: ${form.agent2.persona}
 Goal/Stance: ${form.agent2.stance}
 
-Model: ${form.model}
+Agent 1 Model: ${form.agent1.model}
+Agent 2 Model: ${form.agent2.model}
+
 Rounds: ${form.rounds}`;
 
           setSystemPrompt(updatedPrompt);
