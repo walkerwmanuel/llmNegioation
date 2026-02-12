@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { diffWords } from "diff";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -43,7 +43,7 @@ const spinnerKeyframes = `
 export default function SpeechToText() {
   const defaults: FormState = useMemo(
     () => ({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       topic: "Negotiation over the price of Emily's used car.",
       rules:
         "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn after your introduction.\n2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.",
@@ -111,10 +111,103 @@ export default function SpeechToText() {
   const maxTimeoutRef = useRef<number | null>(null);
   const [sendingToBot, setSendingToBot] = useState(false);
 
-  const TRANSCRIBE_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/transcribe";
-  const RESPOND_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/respond";
-  const SETTINGS_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/update-settings";
+  const TRANSCRIBE_URL = "http://localhost:8025/speech-to-text/transcribe";
+  const RESPOND_URL = "http://localhost:8025/speech-to-text/respond";
+  const SETTINGS_URL = "http://localhost:8025/speech-to-text/update-settings";
 
+  const sendTranscriptToBot = useCallback(async () => {
+    if (sendingToBot) return;
+    try {
+      setError(null);
+      setSendingToBot(true);
+
+      const cleaned = transcript.trim();
+      if (!cleaned) {
+        throw new Error("Transcript is empty. Please type something before sending.");
+      }
+
+    // Build history array
+    const history = messages.map(msg => ({
+      speaker: msg.speaker,
+      content: msg.content
+    }));
+
+    // Build what will actually be sent to backend
+    const requestPayload = { 
+      text: cleaned,
+      history: history
+    };
+
+    const res = await fetch(RESPOND_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestPayload),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errorText}`);
+    }
+
+    const data = await res.json();
+    console.log("Respond response:", data);
+    console.log("Keys:", Object.keys(data));
+
+
+    if (data.error) {
+      throw new Error(data.error);  // surface backend errors clearly
+    }
+
+    if (!data.you || !data.bot) {
+      throw new Error("Unexpected response from server");
+    }
+
+    const actualPrompt = data.actual_system_prompt ?? "";
+    console.log("actual_system_prompt raw value:", data.actual_system_prompt);
+    setSystemPrompt(data.actual_system_prompt || "(empty — key was missing or blank)");
+
+    // Log debug info if present
+    if (data.debug_info) {
+      console.log("Debug info:", data.debug_info);
+    }
+
+    if (!data.you || !data.bot) {
+      throw new Error("Unexpected response from server");
+    }
+
+    const conversationDisplay = [
+      "=== SYSTEM PROMPT ===",
+      data.actual_system_prompt,
+      "",
+      "=== CONVERSATION HISTORY ===",
+      ...history.map(msg => `${msg.speaker}: ${msg.content}`),
+      "",
+      "=== CURRENT MESSAGE ===",
+      `You: ${cleaned}`,
+      "",
+      "=== REQUEST PAYLOAD ===",
+      JSON.stringify(requestPayload, null, 2)
+    ].join('\n');
+
+    setLastPromptSent(conversationDisplay);      
+
+    // Add to chat history
+    setMessages((prev) => [
+      ...prev,
+      { speaker: "You", content: data.you, side: "left" },
+      { speaker: form.agent2.name, content: data.bot, side: "right" },
+    ]);
+
+    // Clear the edit box
+    setTranscript("");
+    setHasTranscript(false);
+  } catch (err: any) {
+    console.error("Error sending transcript:", err);
+    setError(err.message || "Failed to send transcript to bot");
+  } finally {
+    setSendingToBot(false);
+  }
+}, [transcript, sendingToBot, form, RESPOND_URL, messages]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -174,11 +267,7 @@ export default function SpeechToText() {
       const target = event.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
         if (openSettings || editingIndex !== null) {
-          if ((event.ctrlKey || event.metaKey) &&event.code === "Enter") {
-            event.preventDefault();
-            if (editingIndex !== null) onSaveEdit();
-            else if (openSettings) setOpenSettings(false);
-          } else if (event.code === "Escape") {
+          if (event.code === "Escape") {
             event.preventDefault();
             if (editingIndex !== null) {
               setEditingIndex(null);
@@ -216,7 +305,7 @@ export default function SpeechToText() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [messages, recording, openSettings, editingIndex, hasTranscript, sendingToBot]);
+  }, [messages, recording, openSettings, editingIndex, hasTranscript, sendingToBot, transcript, sendTranscriptToBot]);
 
   async function startRecording() {   // Start recording audio
     setError(null);
@@ -362,10 +451,18 @@ export default function SpeechToText() {
       setDraft("");
 
       if (item.speaker === "You") {
+        const history = prefix.slice(0, -1).map(msg => ({
+          speaker: msg.speaker,
+          content: msg.content
+        }));
+
         const res = await fetch(RESPOND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: draft.trim() }),
+          body: JSON.stringify({ 
+            text: draft.trim(),
+            history: history
+          }),
         });
 
         if (!res.ok) {
@@ -386,70 +483,6 @@ export default function SpeechToText() {
       setError(err.message || "Failed to save edit and get response");
     }
   };
-
-  async function sendTranscriptToBot() {
-    if (sendingToBot) return;
-    try {
-      setError(null);
-      setSendingToBot(true);
-
-      const cleaned = transcript.trim();
-      if (!cleaned) {
-        throw new Error("Transcript is empty. Please type something before sending.");
-      }
-
-      const currentSystemPrompt = `You are ${form.agent2.name}.
-
-  ${form.agent2.persona}
-
-  Your goal: ${form.agent2.stance}
-
-  Topic of conversation: ${form.topic}
-
-  ${form.rules}
-
-  Respond to the users message following these guidelines.`;
-
-      // Store it so we can display it in the panel
-      setSystemPrompt(currentSystemPrompt);
-      setLastPromptSent(`User message: ${cleaned}`);      
-
-
-      const res = await fetch(RESPOND_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: cleaned }),
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errorText}`);
-      }
-
-      const data = await res.json();
-      console.log("Respond response:", data);
-
-      if (!data.you || !data.bot) {
-        throw new Error("Unexpected response from server");
-      }
-
-      // Add to chat history
-      setMessages((prev) => [
-        ...prev,
-        { speaker: "You", content: data.you, side: "left" },
-        { speaker: form.agent2.name, content: data.bot, side: "right" },
-      ]);
-
-      // Clear the edit box
-      setTranscript("");
-      setHasTranscript(false);
-    } catch (err: any) {
-      console.error("Error sending transcript:", err);
-      setError(err.message || "Failed to send transcript to bot");
-    } finally {
-      setSendingToBot(false);
-    }
-  }
 
   const chatTranscript = useMemo(() => {
   if (messages.length === 0) return "";
@@ -751,13 +784,30 @@ export default function SpeechToText() {
             </>
           }
         >
-          {/* Model */}
-          <div style={{ marginBottom: 12 }}>
-            <Input
-              label="Model"
-              value={form.model}
-              onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-            />
+          {/* Model + Rounds */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+          <label style={{ fontSize: 12, color: colors.muted }}>Model</label>
+          <select
+            value={form.model}
+            onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))}
+            style={{
+              width: "100%",
+              marginTop: 4,
+              padding: "8px 10px",
+              borderRadius: 6,
+              border: `1px solid ${colors.border}`,
+              background: colors.panelAlt,
+              color: colors.text,
+            }}
+          >
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-5-nano">gpt-5-nano</option>
+            <option value="gpt-5-mini">gpt-5-mini</option>
+            <option value="gpt-5.2">gpt-5.2</option>
+          </select>
+        </div>
           </div>
 
           {/* Topic */}
