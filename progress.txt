@@ -1,0 +1,49 @@
+# Progress Tracker
+# Ralph will update this file after completing each task
+
+## Current Phase: FRONTEND_AUTH_UI_POLISH
+## Current Task: 1.2
+
+## Completed Tasks:
+- 1.1: Make SignInButton adopt theme variables (added CSS variables --color-primary, --color-accent, --color-muted, --auth-bg, --auth-fg to home.css; wrapped GoogleLogin in themed container with prop overrides)
+# (Previous PR completed - kept for archive)
+- 1.1 (OLD): Created backend/database/db.py
+- 1.2 (OLD): Created users table
+- 1.3 (OLD): Created negotiations table
+- 1.4 (OLD): Created messages table
+- 1.5 (OLD): Tested database initialization
+- 2.1 (OLD): Created user_repository.py
+- 2.2 (OLD): Created negotiation_repository.py
+- 2.3 (OLD): Created message_repository.py
+- 3.1 (OLD): Added auth dependencies to requirements.txt
+- 3.2 (OLD): Created backend/auth/config.py
+- 3.3 (OLD): Created backend/auth/jwt_handler.py
+- 3.4 (OLD): Created backend/auth/middleware.py
+- 3.5.1 (OLD): Renamed debates.db to negotiations.db in db.py
+- 3.5.2 (OLD): Renamed debates table to negotiations
+- 3.5.3 (OLD): Updated messages table foreign key (negotiation_id)
+- 3.5.4 (OLD): Renamed debate_repository.py to negotiation_repository.py
+- 3.5.5 (OLD): Updated message_repository.py with negotiation naming
+- 3.5.6 (OLD): Tested all CRUD operations - all passed!
+
+## New Tasks Pending:
+- 1.1: Make SignInButton adopt theme variables (done: true)
+- 1.2: Add subtle animations and accessible focus states to AuthButton (done: false)
+- 1.3: Expose theme colors to backend-configurable override (done: false)
+- 2.1: Make ChatHistorySidebar list items clickable to load negotiation (done: false)
+- 2.2: Format loaded negotiation into rounds in UI (done: false)
+- 2.3: Optional DB migration: add messages.round (INTEGER) (done: false)
+- 2.4: Add 'Load negotiation' spinner and error handling (done: false)
+- 3.1: Create .env.development and .env.production templates (done: false)
+- 3.2: Make npm scripts for separate dev and prod modes (done: false)
+- 3.3: CI: ensure builds use correct mode for deploys (done: false)
+- 4.1: Manual test: Google auth visual & flows (done: false)
+- 4.2: Manual test: history click-to-load and rounds formatting (done: false)
+- 4.3: Update docs and progress.txt (done: false)
+- 4.4: Commit and tag release (done: false)
+
+## Notes:
+- Use the new prd.json as the single source of truth for task ordering.
+- Always implement only the FIRST incomplete task.
+- Commit message format: "Complete task X.X: [short description]"
+- After marking each task done, update prd.json (set done: true for that task) and append the task to Completed Tasks above (with timestamp if desired).

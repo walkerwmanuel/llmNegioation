@@ -1,0 +1,185 @@
+{
+  "project": "AI Negotiations Platform - Cleanup & UI Polish",
+  "description": "Polish Google OAuth to blend with theme, make chat history clickable and load negotiations formatted into rounds, and ensure separate dev/prod builds with env files and npm scripts.",
+  "ui_layout": {
+    "theme_variables": {
+      "primary": "var(--color-primary)",
+      "accent": "var(--color-accent)",
+      "muted": "var(--color-muted)",
+      "auth_button_bg": "var(--auth-bg, var(--color-accent))",
+      "auth_button_fg": "var(--auth-fg, #fff)"
+    },
+    "auth_placement": "OAuth sign-in button in TOP RIGHT corner, styled to blend with header and theme",
+    "negotiation_pages": {
+      "left_side": "Chat history sidebar (280px) clickable list showing past negotiations",
+      "right_side": "Main negotiation content area where the selected negotiation loads and is shown in rounds"
+    }
+  },
+  "tech_stack": {
+    "frontend": "TypeScript/React (Vite)",
+    "backend": "Python (Flask / FastAPI compatible)",
+    "database": "SQLite (negotiations.db)",
+    "auth": "Google OAuth (frontend: @react-oauth/google; backend: google-auth)"
+  },
+  "phases": [
+    {
+      "phase": 1,
+      "name": "FRONTEND_AUTH_UI_POLISH",
+      "completion_promise": "<promise>PHASE1_AUTH_UI_DONE</promise>",
+      "tasks": [
+        {
+          "id": "1.1",
+          "task": "Make SignInButton adopt theme variables",
+          "done": true,
+          "details": "Update frontend/src/components/auth/SignInButton.tsx to read CSS variables (see ui_layout.theme_variables). Provide props or context override for brandable color. Keep structure using @react-oauth/google but wrap with styled container to blend into header.",
+          "test_instructions": "Run dev, open header, verify SignInButton matches --color-accent and hover states."
+        },
+        {
+          "id": "1.2",
+          "task": "Add subtle animations and accessible focus states to AuthButton",
+          "done": false,
+          "details": "Add a 150ms scale and shadow animation on hover/focus. Ensure keyboard focus is visible and ARIA attributes present.",
+          "test_instructions": "Tab to AuthButton; verify focus ring; hover to see animation."
+        },
+        {
+          "id": "1.3",
+          "task": "Expose theme colors to backend-configurable override",
+          "done": false,
+          "details": "Allow an optional FRONTEND_THEME env var (JSON string or URL to theme) so header can be themed for deployments. Provide fallback to CSS variables.",
+          "fixup_needed": "Update frontend startup documentation to explain FRONTEND_THEME usage."
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "FRONTEND_HISTORY_INTERACTION",
+      "completion_promise": "<promise>PHASE2_HISTORY_DONE</promise>",
+      "tasks": [
+        {
+          "id": "2.1",
+          "task": "Make ChatHistorySidebar list items clickable to load negotiation",
+          "done": false,
+          "details": "Update frontend/src/components/history/ChatHistorySidebar.tsx and NegotiationListItem to call onSelectNegotiation(negotiation.id). Ensure selection state highlights the active item and triggers useNegotiationSession.loadNegotiation(id).",
+          "test_instructions": "Create a negotiation, click it in sidebar, verify negotiation loads in main view."
+        },
+        {
+          "id": "2.2",
+          "task": "Format loaded negotiation into rounds in UI",
+          "done": false,
+          "details": "Implement formatting for negotiations so messages display grouped into rounds. Each round = one user turn and the corresponding AI responses. Provide a clear visual separation (Round 1, Round 2...). Implement in frontend only by grouping messages by sequence; do NOT change DB yet.",
+          "test_instructions": "Load a negotiation with alternating roles and verify grouped rounds show correct pairing and timestamps."
+        },
+        {
+          "id": "2.3",
+          "task": "Optional DB migration: add messages.round (INTEGER)",
+          "done": false,
+          "details": "Add migration script (backend/database/migrations/xxx_add_message_round.sql) to add nullable 'round' INTEGER to messages. Backfill round numbers by grouping existing messages by chronological order: every user message increments the round. This task is optional — only do if grouping logic in UI proves insufficient for stable round indexing.",
+          "fixup_needed": "Ensure repositories update add_message to accept optional round parameter and update get_messages to return it."
+        },
+        {
+          "id": "2.4",
+          "task": "Add 'Load negotiation' spinner and error handling",
+          "done": false,
+          "details": "When clicking a history item, show skeleton spinner in the main panel until messages are fetched. Show friendly error (toast) on failure and retry button.",
+          "test_instructions": "Simulate backend failure (400/500) and confirm UI shows retry option."
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "BUILD_AND_ENV_SETUP",
+      "completion_promise": "<promise>PHASE3_ENV_DONE</promise>",
+      "tasks": [
+        {
+          "id": "3.1",
+          "task": "Create .env.development and .env.production templates",
+          "done": false,
+          "details": "Add frontend/.env.development and frontend/.env.production with keys: VITE_API_URL, VITE_GOOGLE_CLIENT_ID, VITE_APP_NAME, optionally FRONTEND_THEME. Add backend/.env.development and backend/.env.production with GOOGLE_CLIENT_ID, JWT_SECRET_KEY, FRONTEND_URL.",
+          "env_files": {
+            "frontend/.env.development": [
+              "VITE_API_URL=http://localhost:8000",
+              "VITE_GOOGLE_CLIENT_ID=your_google_client_id",
+              "VITE_APP_NAME=AI Negotiations (Dev)",
+              "FRONTEND_THEME="
+            ],
+            "frontend/.env.production": [
+              "VITE_API_URL=https://api.example.com",
+              "VITE_GOOGLE_CLIENT_ID=your_google_client_id",
+              "VITE_APP_NAME=AI Negotiations",
+              "FRONTEND_THEME="
+            ],
+            "backend/.env.development": [
+              "GOOGLE_CLIENT_ID=your_google_client_id",
+              "JWT_SECRET_KEY=your_jwt_secret_dev",
+              "FRONTEND_URL=http://localhost:3000"
+            ],
+            "backend/.env.production": [
+              "GOOGLE_CLIENT_ID=your_google_client_id",
+              "JWT_SECRET_KEY=your_jwt_secret_prod",
+              "FRONTEND_URL=https://app.example.com"
+            ]
+          },
+          "test_instructions": "Run dev and prod scripts to ensure each picks the correct .env file (see tasks below)."
+        },
+        {
+          "id": "3.2",
+          "task": "Make npm scripts for separate dev and prod modes",
+          "done": false,
+          "details": "Update frontend/package.json scripts: \"dev\": \"vite --mode development\", \"prod\": \"vite build --mode production && vite preview --strictPort --port 5000\". Ensure docs explain how to run both locally.",
+          "test_instructions": "Run `npm run dev` and confirm app runs on port 3000 (or configured). Run `npm run prod` and confirm built preview serves the production build."
+        },
+        {
+          "id": "3.3",
+          "task": "CI: ensure builds use correct mode for deploys",
+          "done": false,
+          "details": "Update CI workflow / deployment scripts to run `npm run prod` for production deploys, and `npm run dev` only for local dev. Provide a short CI snippet in docs.",
+          "test_instructions": "If CI exists, run a local simulation of the CI step or dry-run script."
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "TESTING_DOCUMENTATION_AND_CLEANUP",
+      "completion_promise": "<promise>ALL_COMPLETE</promise>",
+      "tasks": [
+        {
+          "id": "4.1",
+          "task": "Manual test: Google auth visual & flows",
+          "done": false,
+          "details": "Test sign-in, sign-out, account switching. Verify UI colors and focus states across major browsers. Verify token persisted and /api/auth/me returns user after page reload.",
+          "test_instructions": "Perform sign in, reload, verify user still present; sign out and verify token cleared."
+        },
+        {
+          "id": "4.2",
+          "task": "Manual test: history click-to-load and rounds formatting",
+          "done": false,
+          "details": "Create several negotiations with mixed user/ai messages. Click several history items and verify correct negotiation loads and rounds are accurate. Test edge cases where negotiation has only AI messages or only user messages.",
+          "test_instructions": "Verify round labels, message order, and timestamps."
+        },
+        {
+          "id": "4.3",
+          "task": "Update docs and progress.txt",
+          "done": false,
+          "details": "Update README with new npm scripts, env file info, and theme overrides. Update progress.txt to reflect completed tasks as each iteration finishes.",
+          "test_instructions": "Open README and progress.txt and check for accurate instructions."
+        },
+        {
+          "id": "4.4",
+          "task": "Commit and tag release",
+          "done": false,
+          "details": "After all tasks complete, create a release commit with message: \"Complete cleanup & UI polish: auth UI, history interactions, env build scripts\" and tag v1.1.0.",
+          "test_instructions": "Verify tag exists and build artifacts are present for prod."
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "rationale": "Keep changes minimal per iteration. First implement frontend-only grouping & UI polish; only add DB migration if frontend grouping is insufficient.",
+    "developer_guidelines": [
+      "Only work on the FIRST task where done=false",
+      "Keep PRs small and single-purpose",
+      "Write tests (manual or unit) where practical",
+      "Update progress.txt and prd.json after completing a task"
+    ]
+  }
+}
