@@ -44,7 +44,7 @@
         {
           "id": "1.3",
           "task": "Expose theme colors to backend-configurable override",
-          "done": false,
+          "done": true,
           "details": "Allow an optional FRONTEND_THEME env var (JSON string or URL to theme) so header can be themed for deployments. Provide fallback to CSS variables.",
           "fixup_needed": "Update frontend startup documentation to explain FRONTEND_THEME usage."
         }
