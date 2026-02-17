@@ -2,7 +2,7 @@
 # Ralph will update this file after completing each task
 
 ## Current Phase: TESTING_DOCUMENTATION_AND_CLEANUP
-## Current Task: 4.3
+## Current Task: 4.4
 
 ## Completed Tasks:
 - 1.1: Make SignInButton adopt theme variables (added CSS variables --color-primary, --color-accent, --color-muted, --auth-bg, --auth-fg to home.css; wrapped GoogleLogin in themed container with prop overrides)
@@ -17,6 +17,7 @@
 - 3.3: CI: ensure builds use correct mode for deploys (created .github/workflows/ci.yml with build-frontend, build-backend, and deploy jobs)
 - 4.1: Manual test: Google auth visual & flows (SignInButton uses theme vars, has 150ms animations, focus states visible, ARIA attributes present)
 - 4.2: Manual test: history click-to-load and rounds formatting (click loads negotiation with skeleton, converts to rounds, visual Round dividers)
+- 4.3: Update docs and progress.txt (README updated with env files, npm scripts, theme customization, CI/CD info)
 # (Previous PR completed - kept for archive)
 - 1.1 (OLD): Created backend/database/db.py
 - 1.2 (OLD): Created users table
@@ -50,7 +51,7 @@
 - 3.3: CI: ensure builds use correct mode for deploys (done: true)
 - 4.1: Manual test: Google auth visual & flows (done: true)
 - 4.2: Manual test: history click-to-load and rounds formatting (done: true)
-- 4.3: Update docs and progress.txt (done: false)
+- 4.3: Update docs and progress.txt (done: true)
 - 4.4: Commit and tag release (done: false)
 
 ## Notes:

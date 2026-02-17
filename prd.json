@@ -159,7 +159,7 @@
         {
           "id": "4.3",
           "task": "Update docs and progress.txt",
-          "done": false,
+          "done": true,
           "details": "Update README with new npm scripts, env file info, and theme overrides. Update progress.txt to reflect completed tasks as each iteration finishes.",
           "test_instructions": "Open README and progress.txt and check for accurate instructions."
         },
