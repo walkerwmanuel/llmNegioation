@@ -72,7 +72,7 @@
         {
           "id": "2.3",
           "task": "Optional DB migration: add messages.round (INTEGER)",
-          "done": false,
+          "done": true,
           "details": "Add migration script (backend/database/migrations/xxx_add_message_round.sql) to add nullable 'round' INTEGER to messages. Backfill round numbers by grouping existing messages by chronological order: every user message increments the round. This task is optional — only do if grouping logic in UI proves insufficient for stable round indexing.",
           "fixup_needed": "Ensure repositories update add_message to accept optional round parameter and update get_messages to return it."
         },

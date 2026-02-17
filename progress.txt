@@ -2,7 +2,7 @@
 # Ralph will update this file after completing each task
 
 ## Current Phase: FRONTEND_HISTORY_INTERACTION
-## Current Task: 2.3
+## Current Task: 2.4
 
 ## Completed Tasks:
 - 1.1: Make SignInButton adopt theme variables (added CSS variables --color-primary, --color-accent, --color-muted, --auth-bg, --auth-fg to home.css; wrapped GoogleLogin in themed container with prop overrides)
@@ -10,6 +10,7 @@
 - 1.3: Expose theme colors to backend-configurable override (created ThemeContext with VITE_FRONTEND_THEME env var support; accepts JSON string or URL; applies to CSS variables at runtime)
 - 2.1: Make ChatHistorySidebar list items clickable to load negotiation (updated handleSelectNegotiation to convert loaded messages to ChatItem format; hook now returns negotiation)
 - 2.2: Format loaded negotiation into rounds in UI (created convertMessagesToRounds function; each round = one left + one right speaker exchange; visual Round dividers shown)
+- 2.3: Optional DB migration: add messages.round (INTEGER) - SKIPPED (frontend grouping by chronological order is sufficient; no DB schema change needed)
 # (Previous PR completed - kept for archive)
 - 1.1 (OLD): Created backend/database/db.py
 - 1.2 (OLD): Created users table
@@ -36,7 +37,7 @@
 - 1.3: Expose theme colors to backend-configurable override (done: true)
 - 2.1: Make ChatHistorySidebar list items clickable to load negotiation (done: true)
 - 2.2: Format loaded negotiation into rounds in UI (done: true)
-- 2.3: Optional DB migration: add messages.round (INTEGER) (done: false)
+- 2.3: Optional DB migration: add messages.round (INTEGER) (done: true - SKIPPED, frontend grouping is sufficient)
 - 2.4: Add 'Load negotiation' spinner and error handling (done: false)
 - 3.1: Create .env.development and .env.production templates (done: false)
 - 3.2: Make npm scripts for separate dev and prod modes (done: false)
