@@ -152,7 +152,7 @@
         {
           "id": "4.2",
           "task": "Manual test: history click-to-load and rounds formatting",
-          "done": false,
+          "done": true,
           "details": "Create several negotiations with mixed user/ai messages. Click several history items and verify correct negotiation loads and rounds are accurate. Test edge cases where negotiation has only AI messages or only user messages.",
           "test_instructions": "Verify round labels, message order, and timestamps."
         },
