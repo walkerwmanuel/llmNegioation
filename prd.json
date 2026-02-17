@@ -131,7 +131,7 @@
         {
           "id": "3.3",
           "task": "CI: ensure builds use correct mode for deploys",
-          "done": false,
+          "done": true,
           "details": "Update CI workflow / deployment scripts to run `npm run prod` for production deploys, and `npm run dev` only for local dev. Provide a short CI snippet in docs.",
           "test_instructions": "If CI exists, run a local simulation of the CI step or dry-run script."
         }
