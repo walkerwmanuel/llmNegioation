@@ -145,7 +145,7 @@
         {
           "id": "4.1",
           "task": "Manual test: Google auth visual & flows",
-          "done": false,
+          "done": true,
           "details": "Test sign-in, sign-out, account switching. Verify UI colors and focus states across major browsers. Verify token persisted and /api/auth/me returns user after page reload.",
           "test_instructions": "Perform sign in, reload, verify user still present; sign out and verify token cleared."
         },
