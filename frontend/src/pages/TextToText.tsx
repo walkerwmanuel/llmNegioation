@@ -322,52 +322,66 @@ export default function TextToText() {
 
     const negotiation = await loadNegotiation(id);
 
-    // Convert loaded messages to ChatItem format for display
+    // Convert loaded messages to ChatItem format with round grouping
     if (negotiation && negotiation.messages) {
-      const chatItems: ChatItem[] = [];
-      let currentRound = 0;
-
-      negotiation.messages.forEach((msg, index) => {
-        // Determine round - each user/ai_1 message starts a new round
-        if (msg.role === 'user' || msg.role === 'ai_1') {
-          if (index === 0 || chatItems.length === 0) {
-            currentRound = 1;
-            chatItems.push({ kind: 'round', round: currentRound });
-          } else if (msg.role === 'ai_1' && chatItems.length > 0) {
-            // Check if last message was not ai_1 (new round starts)
-            const lastItem = chatItems[chatItems.length - 1];
-            if (lastItem.kind === 'turn' && (lastItem.speaker !== form.agent1.name)) {
-              currentRound++;
-              chatItems.push({ kind: 'round', round: currentRound });
-            }
-          }
-        }
-
-        // Map role to speaker and side
-        let speaker: string;
-        let side: 'left' | 'right';
-
-        if (msg.role === 'ai_1') {
-          speaker = form.agent1.name;
-          side = 'left';
-        } else if (msg.role === 'ai_2') {
-          speaker = form.agent2.name;
-          side = 'right';
-        } else {
-          speaker = msg.role;
-          side = 'left';
-        }
-
-        chatItems.push({
-          kind: 'turn',
-          speaker,
-          content: msg.content,
-          side,
-        });
-      });
-
+      const chatItems = convertMessagesToRounds(negotiation.messages);
       setMessages(chatItems);
     }
+  };
+
+  /**
+   * Convert messages to ChatItem format grouped by rounds.
+   * Each round = one exchange between participants:
+   * - For ai_vs_ai: ai_1 message + ai_2 message = 1 round
+   * - For human: user message + AI response = 1 round
+   */
+  const convertMessagesToRounds = (msgs: { role: string; content: string }[]): ChatItem[] => {
+    if (msgs.length === 0) return [];
+
+    const chatItems: ChatItem[] = [];
+    let currentRound = 0;
+    let lastLeftSpeaker = false; // Track if last message was from left (ai_1/user)
+
+    msgs.forEach((msg, index) => {
+      // Map role to speaker and side
+      let speaker: string;
+      let side: 'left' | 'right';
+
+      if (msg.role === 'ai_1') {
+        speaker = form.agent1.name;
+        side = 'left';
+      } else if (msg.role === 'ai_2') {
+        speaker = form.agent2.name;
+        side = 'right';
+      } else if (msg.role === 'user') {
+        speaker = 'You';
+        side = 'left';
+      } else {
+        speaker = msg.role;
+        side = 'left';
+      }
+
+      // Determine when to start a new round:
+      // - At the start (index 0)
+      // - When left speaker starts after a right speaker message
+      const isLeftSpeaker = side === 'left';
+
+      if (index === 0 || (isLeftSpeaker && !lastLeftSpeaker)) {
+        currentRound++;
+        chatItems.push({ kind: 'round', round: currentRound });
+      }
+
+      lastLeftSpeaker = isLeftSpeaker;
+
+      chatItems.push({
+        kind: 'turn',
+        speaker,
+        content: msg.content,
+        side,
+      });
+    });
+
+    return chatItems;
   };
 
   // Handle new negotiation from sidebar

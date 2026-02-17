@@ -65,7 +65,7 @@
         {
           "id": "2.2",
           "task": "Format loaded negotiation into rounds in UI",
-          "done": false,
+          "done": true,
           "details": "Implement formatting for negotiations so messages display grouped into rounds. Each round = one user turn and the corresponding AI responses. Provide a clear visual separation (Round 1, Round 2...). Implement in frontend only by grouping messages by sequence; do NOT change DB yet.",
           "test_instructions": "Load a negotiation with alternating roles and verify grouped rounds show correct pairing and timestamps."
         },
