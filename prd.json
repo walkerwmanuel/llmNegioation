@@ -199,7 +199,7 @@
         {
           "id": "5.3",
           "task": "Create backend endpoint to update message content",
-          "done": false,
+          "done": true,
           "details": "Add PATCH /api/messages/:id endpoint. Verify message belongs to user. Update content, set edited_at, and preserve original_content if first edit.",
           "test_instructions": "Call endpoint with valid and invalid users. Confirm permissions enforced."
         },

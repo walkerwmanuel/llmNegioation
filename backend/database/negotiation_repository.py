@@ -39,6 +39,22 @@ def get_user_negotiations(user_id: int) -> List[dict]:
     return negotiations
 
 
+def get_negotiation_by_id(negotiation_id: int, user_id: int) -> Optional[dict]:
+    """Returns negotiation if owned by user, or None"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT * FROM negotiations
+        WHERE id = ? AND user_id = ?
+    ''', (negotiation_id, user_id))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return dict(row) if row else None
+
+
 def get_negotiation_with_messages(negotiation_id: int, user_id: int) -> Optional[dict]:
     """Returns negotiation with messages array, or None if not found or not owned by user"""
     conn = get_db_connection()
