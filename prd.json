@@ -172,6 +172,81 @@
         }
       ]
     }
+    ,
+    {
+      "phase": 5,
+      "name": "TRANSCRIPT_EDITS_AND_HISTORY_RELIABILITY",
+      "completion_promise": "<promise>PHASE5_TRANSCRIPTS_DONE</promise>",
+      "tasks": [
+        {
+          "id": "5.1",
+          "task": "Allow transcript messages to be edited in UI",
+          "done": true,
+          "details": "In TextToText and SpeechToText views, allow users to edit their own transcript messages. Add an Edit button on user messages. Editing opens inline textarea with Save/Cancel. On save, update local state immediately and send update to backend.",
+          "test_instructions": "Edit a user message and verify UI updates immediately and persists after page reload."
+        },
+        {
+          "id": "5.2",
+          "task": "Add database support for edited messages",
+          "done": false,
+          "details": "Add columns to messages table: edited_at (TIMESTAMP NULL), original_content (TEXT NULL). When a message is edited: original_content stores the first version, content stores the latest version, edited_at is set. Provide migration script.",
+          "migration_sql": [
+            "ALTER TABLE messages ADD COLUMN edited_at TIMESTAMP;",
+            "ALTER TABLE messages ADD COLUMN original_content TEXT;"
+          ],
+          "test_instructions": "Edit a message and confirm original_content is preserved and edited_at is populated."
+        },
+        {
+          "id": "5.3",
+          "task": "Create backend endpoint to update message content",
+          "done": false,
+          "details": "Add PATCH /api/messages/:id endpoint. Verify message belongs to user. Update content, set edited_at, and preserve original_content if first edit.",
+          "test_instructions": "Call endpoint with valid and invalid users. Confirm permissions enforced."
+        },
+        {
+          "id": "5.4",
+          "task": "Show edited indicator in negotiation history",
+          "done": false,
+          "details": "Display '(edited)' label next to edited messages. Optionally allow hover tooltip to show original content.",
+          "test_instructions": "Edit a message and verify indicator appears in negotiation view and history."
+        },
+        {
+          "id": "5.5",
+          "task": "Persist edited transcript versions in negotiation history",
+          "done": false,
+          "details": "Ensure that when loading negotiation history, edited messages display the latest content while preserving metadata (edited_at). If tooltip enabled, show original content.",
+          "test_instructions": "Reload negotiation and verify edited state remains."
+        },
+        {
+          "id": "5.6",
+          "task": "Investigate bug: some negotiations do not load when clicked",
+          "done": false,
+          "details": "Add logging and diagnostics to identify why certain negotiations fail to load. Possible causes to check: missing messages, stale IDs, auth mismatch, race conditions, API errors. Log negotiation_id and response status.",
+          "test_instructions": "Attempt to load failing negotiations and verify logs capture failure cause."
+        },
+        {
+          "id": "5.7",
+          "task": "Fix negotiation loading reliability",
+          "done": false,
+          "details": "Based on findings from 5.6, implement fixes. Ensure: correct user ownership checks, fallback UI for empty negotiations, retry logic, and defensive null handling. Ensure no negotiation silently fails to load.",
+          "test_instructions": "Create multiple negotiations and confirm all load correctly across sessions and browsers."
+        },
+        {
+          "id": "5.8",
+          "task": "Add automated safeguard for missing negotiations",
+          "done": false,
+          "details": "If negotiation fails to load, show user-friendly message and retry button. Prevent UI freeze. Log error for debugging.",
+          "test_instructions": "Simulate API failure and verify retry UI appears."
+        },
+        {
+          "id": "5.9",
+          "task": "Manual test: transcript edits and history reliability",
+          "done": false,
+          "details": "Test editing transcripts, reloading, switching negotiations, and verifying edited messages persist. Confirm previously failing negotiations now load.",
+          "test_instructions": "Perform end-to-end test across multiple browsers."
+        }
+      ]
+    }
   ],
   "notes": {
     "rationale": "Keep changes minimal per iteration. First implement frontend-only grouping & UI polish; only add DB migration if frontend grouping is insufficient.",

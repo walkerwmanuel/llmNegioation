@@ -1,8 +1,8 @@
 # Progress Tracker
 # Ralph will update this file after completing each task
 
-## Current Phase: COMPLETE
-## Current Task: NONE - All tasks complete
+## Current Phase: TRANSCRIPT_EDITS_AND_HISTORY_RELIABILITY
+## Current Task: 5.2
 
 ## Completed Tasks:
 - 1.1: Make SignInButton adopt theme variables (added CSS variables --color-primary, --color-accent, --color-muted, --auth-bg, --auth-fg to home.css; wrapped GoogleLogin in themed container with prop overrides)
@@ -19,6 +19,7 @@
 - 4.2: Manual test: history click-to-load and rounds formatting (click loads negotiation with skeleton, converts to rounds, visual Round dividers)
 - 4.3: Update docs and progress.txt (README updated with env files, npm scripts, theme customization, CI/CD info)
 - 4.4: Commit and tag release - v1.1.0 (cleanup & UI polish complete)
+- 5.1: Allow transcript messages to be edited in UI (edit button on all messages via ChatBubble; inline textarea with Save/Cancel; local state updates immediately)
 # (Previous PR completed - kept for archive)
 - 1.1 (OLD): Created backend/database/db.py
 - 1.2 (OLD): Created users table
