@@ -16,7 +16,7 @@ export function UserMenu() {
   const isActive = isHovered || isFocused;
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', zIndex: 9999 }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         onMouseEnter={() => setIsHovered(true)}
@@ -41,9 +41,9 @@ export function UserMenu() {
             ? '0 4px 12px rgba(0, 0, 0, 0.2)'
             : '0 1px 4px rgba(0, 0, 0, 0.1)',
           transition: 'transform 150ms ease, box-shadow 150ms ease, outline 150ms ease',
-          // Focus ring for accessibility
+          // Focus ring for accessibility - blue
           outline: isFocused
-            ? '3px solid var(--ring, rgba(204, 0, 0, 0.5))'
+            ? '3px solid rgba(26, 86, 219, 0.5)'
             : 'none',
           outlineOffset: '2px',
         }}
@@ -92,13 +92,13 @@ export function UserMenu() {
             background: 'white',
             border: '1px solid #ddd',
             borderRadius: '8px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-            minWidth: '150px',
-            zIndex: 1000,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            minWidth: '180px',
+            zIndex: 10000,
           }}
         >
           <div style={{ padding: '12px', borderBottom: '1px solid #eee' }}>
-            <div style={{ fontWeight: 'bold' }}>{user.name}</div>
+            <div style={{ fontWeight: 'bold', color: '#333' }}>{user.name}</div>
             <div style={{ fontSize: '12px', color: '#666' }}>{user.email}</div>
           </div>
           <button
@@ -126,6 +126,7 @@ export function UserMenu() {
               background: 'none',
               cursor: 'pointer',
               textAlign: 'left',
+              color: '#333',
               transition: 'background 150ms ease',
             }}
           >

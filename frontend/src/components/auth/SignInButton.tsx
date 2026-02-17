@@ -47,21 +47,18 @@ export function SignInButton({ bgColor, fgColor }: SignInButtonProps) {
         alignItems: 'center',
         padding: '2px',
         borderRadius: '10px',
-        background: bgColor || 'var(--auth-bg, var(--color-accent, #CC0000))',
+        background: bgColor || '#1a56db',
         boxShadow: isActive
           ? '0 4px 12px rgba(0, 0, 0, 0.25)'
           : '0 2px 8px rgba(0, 0, 0, 0.15)',
         // Animation properties
         transform: isActive ? 'scale(1.02)' : 'scale(1)',
         transition: 'transform 150ms ease, box-shadow 150ms ease, outline 150ms ease',
-        // Focus ring for accessibility
+        // Focus ring for accessibility - darker blue
         outline: isFocused
-          ? '3px solid var(--ring, rgba(204, 0, 0, 0.5))'
+          ? '3px solid rgba(26, 86, 219, 0.5)'
           : 'none',
         outlineOffset: '2px',
-        // CSS custom properties for potential use by child elements
-        ['--wrapper-bg' as string]: bgColor || 'var(--auth-bg, var(--color-accent, #CC0000))',
-        ['--wrapper-fg' as string]: fgColor || 'var(--auth-fg, #fff)',
         cursor: 'pointer',
       }}
     >
