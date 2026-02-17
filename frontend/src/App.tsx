@@ -10,6 +10,8 @@ export default function App() {
       {/* GLOBAL HERO HEADER (dark) */}
       <header
         style={{
+          position: "relative",
+          zIndex: 9999,
           background:
             "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)",
           color: "#fff",
