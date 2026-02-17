@@ -34,16 +34,18 @@ export function useNegotiationSession() {
   );
 
   const loadNegotiation = useCallback(
-    async (id: number) => {
-      if (!isAuthenticated) return;
+    async (id: number): Promise<NegotiationWithMessages | null> => {
+      if (!isAuthenticated) return null;
 
       setIsLoading(true);
       try {
         const negotiation: NegotiationWithMessages = await getNegotiation(id);
         setCurrentNegotiationId(negotiation.id);
         setMessages(negotiation.messages);
+        return negotiation;
       } catch (error) {
         console.error('Failed to load negotiation:', error);
+        return null;
       } finally {
         setIsLoading(false);
       }

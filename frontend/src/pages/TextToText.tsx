@@ -315,9 +315,59 @@ export default function TextToText() {
 
   // Handle selecting a negotiation from sidebar
   const handleSelectNegotiation = async (id: number) => {
-    await loadNegotiation(id);
-    // Note: In a full implementation, we'd load and display the messages
-    // For now, this sets the current negotiation context
+    setErr(null);
+    setMessages([]);
+    setPaused(false);
+    setLoading(false);
+
+    const negotiation = await loadNegotiation(id);
+
+    // Convert loaded messages to ChatItem format for display
+    if (negotiation && negotiation.messages) {
+      const chatItems: ChatItem[] = [];
+      let currentRound = 0;
+
+      negotiation.messages.forEach((msg, index) => {
+        // Determine round - each user/ai_1 message starts a new round
+        if (msg.role === 'user' || msg.role === 'ai_1') {
+          if (index === 0 || chatItems.length === 0) {
+            currentRound = 1;
+            chatItems.push({ kind: 'round', round: currentRound });
+          } else if (msg.role === 'ai_1' && chatItems.length > 0) {
+            // Check if last message was not ai_1 (new round starts)
+            const lastItem = chatItems[chatItems.length - 1];
+            if (lastItem.kind === 'turn' && (lastItem.speaker !== form.agent1.name)) {
+              currentRound++;
+              chatItems.push({ kind: 'round', round: currentRound });
+            }
+          }
+        }
+
+        // Map role to speaker and side
+        let speaker: string;
+        let side: 'left' | 'right';
+
+        if (msg.role === 'ai_1') {
+          speaker = form.agent1.name;
+          side = 'left';
+        } else if (msg.role === 'ai_2') {
+          speaker = form.agent2.name;
+          side = 'right';
+        } else {
+          speaker = msg.role;
+          side = 'left';
+        }
+
+        chatItems.push({
+          kind: 'turn',
+          speaker,
+          content: msg.content,
+          side,
+        });
+      });
+
+      setMessages(chatItems);
+    }
   };
 
   // Handle new negotiation from sidebar

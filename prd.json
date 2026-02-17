@@ -58,7 +58,7 @@
         {
           "id": "2.1",
           "task": "Make ChatHistorySidebar list items clickable to load negotiation",
-          "done": false,
+          "done": true,
           "details": "Update frontend/src/components/history/ChatHistorySidebar.tsx and NegotiationListItem to call onSelectNegotiation(negotiation.id). Ensure selection state highlights the active item and triggers useNegotiationSession.loadNegotiation(id).",
           "test_instructions": "Create a negotiation, click it in sidebar, verify negotiation loads in main view."
         },
