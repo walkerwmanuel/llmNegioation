@@ -79,7 +79,7 @@
         {
           "id": "2.4",
           "task": "Add 'Load negotiation' spinner and error handling",
-          "done": false,
+          "done": true,
           "details": "When clicking a history item, show skeleton spinner in the main panel until messages are fetched. Show friendly error (toast) on failure and retry button.",
           "test_instructions": "Simulate backend failure (400/500) and confirm UI shows retry option."
         }

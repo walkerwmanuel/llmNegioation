@@ -8,6 +8,7 @@ export function useNegotiationSession() {
   const [currentNegotiationId, setCurrentNegotiationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const startNewNegotiation = useCallback(
     async (topic: string, negotiation_type: string) => {
@@ -18,6 +19,7 @@ export function useNegotiationSession() {
       }
 
       setIsLoading(true);
+      setLoadError(null);
       try {
         const negotiation = await createNegotiation(topic, negotiation_type);
         setCurrentNegotiationId(negotiation.id);
@@ -25,6 +27,7 @@ export function useNegotiationSession() {
         return negotiation.id;
       } catch (error) {
         console.error('Failed to start negotiation:', error);
+        setLoadError('Failed to start negotiation. Please try again.');
         return null;
       } finally {
         setIsLoading(false);
@@ -38,6 +41,7 @@ export function useNegotiationSession() {
       if (!isAuthenticated) return null;
 
       setIsLoading(true);
+      setLoadError(null);
       try {
         const negotiation: NegotiationWithMessages = await getNegotiation(id);
         setCurrentNegotiationId(negotiation.id);
@@ -45,6 +49,7 @@ export function useNegotiationSession() {
         return negotiation;
       } catch (error) {
         console.error('Failed to load negotiation:', error);
+        setLoadError('Failed to load negotiation. Please try again.');
         return null;
       } finally {
         setIsLoading(false);
@@ -92,15 +97,22 @@ export function useNegotiationSession() {
   const clearSession = useCallback(() => {
     setCurrentNegotiationId(null);
     setMessages([]);
+    setLoadError(null);
+  }, []);
+
+  const clearError = useCallback(() => {
+    setLoadError(null);
   }, []);
 
   return {
     currentNegotiationId,
     messages,
     isLoading,
+    loadError,
     startNewNegotiation,
     loadNegotiation,
     saveMessage,
     clearSession,
+    clearError,
   };
 }

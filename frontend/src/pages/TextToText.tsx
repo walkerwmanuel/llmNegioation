@@ -179,11 +179,17 @@ export default function TextToText() {
   const { isAuthenticated } = useAuth();
   const {
     currentNegotiationId,
+    isLoading: isLoadingNegotiation,
+    loadError: negotiationLoadError,
     startNewNegotiation,
     loadNegotiation,
     saveMessage,
     clearSession,
+    clearError: clearNegotiationError,
   } = useNegotiationSession();
+
+  // Track which negotiation ID we're trying to load (for retry)
+  const [pendingLoadId, setPendingLoadId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!stickToBottom) return;
@@ -319,6 +325,8 @@ export default function TextToText() {
     setMessages([]);
     setPaused(false);
     setLoading(false);
+    setPendingLoadId(id);
+    clearNegotiationError();
 
     const negotiation = await loadNegotiation(id);
 
@@ -326,6 +334,14 @@ export default function TextToText() {
     if (negotiation && negotiation.messages) {
       const chatItems = convertMessagesToRounds(negotiation.messages);
       setMessages(chatItems);
+      setPendingLoadId(null);
+    }
+  };
+
+  // Retry loading a negotiation after error
+  const handleRetryLoad = async () => {
+    if (pendingLoadId !== null) {
+      await handleSelectNegotiation(pendingLoadId);
     }
   };
 
@@ -533,14 +549,46 @@ export default function TextToText() {
         </CardHeader>
 
         <CardContent style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {/* General error display */}
           {err && (
             <div style={{ padding: 12, borderRadius: 8, border: "1px solid #7f1d1d", background: "#1f1111", color: "#fecaca", marginBottom: 12 }}>
               {err}
             </div>
           )}
 
+          {/* Negotiation load error with retry */}
+          {negotiationLoadError && (
+            <div
+              style={{
+                padding: 16,
+                borderRadius: 8,
+                border: "1px solid #7f1d1d",
+                background: "#1f1111",
+                color: "#fecaca",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>{negotiationLoadError}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRetryLoad}
+                style={{
+                  borderColor: "#fecaca",
+                  color: "#fecaca",
+                  marginLeft: 12,
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+
           <div
-          
+
             ref={chatRef}
             onScroll={onScroll}
             style={{
@@ -556,7 +604,60 @@ export default function TextToText() {
               minHeight: 0,
             }}
           >
-            {messages.length === 0 && !loading && (
+            {/* Loading skeleton for negotiation load */}
+            {isLoadingNegotiation && messages.length === 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      background: "rgba(255,255,255,0.05)",
+                      border: `1px solid ${colors.border}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: 12,
+                        width: "30%",
+                        background: "rgba(255,255,255,0.1)",
+                        borderRadius: 4,
+                        marginBottom: 10,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: 14,
+                        width: "85%",
+                        background: "rgba(255,255,255,0.08)",
+                        borderRadius: 4,
+                        marginBottom: 6,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: 14,
+                        width: "70%",
+                        background: "rgba(255,255,255,0.08)",
+                        borderRadius: 4,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                  </div>
+                ))}
+                <style>{`
+                  @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                  }
+                `}</style>
+              </div>
+            )}
+
+            {messages.length === 0 && !loading && !isLoadingNegotiation && (
               <div style={{ color: colors.muted, fontSize: 14 }}>Transcript will appear here.</div>
             )}
 
