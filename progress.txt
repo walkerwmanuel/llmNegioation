@@ -2,7 +2,7 @@
 # Ralph will update this file after completing each task
 
 ## Current Phase: BUILD_AND_ENV_SETUP
-## Current Task: 3.2
+## Current Task: 3.3
 
 ## Completed Tasks:
 - 1.1: Make SignInButton adopt theme variables (added CSS variables --color-primary, --color-accent, --color-muted, --auth-bg, --auth-fg to home.css; wrapped GoogleLogin in themed container with prop overrides)
@@ -13,6 +13,7 @@
 - 2.3: Optional DB migration: add messages.round (INTEGER) - SKIPPED (frontend grouping by chronological order is sufficient; no DB schema change needed)
 - 2.4: Add 'Load negotiation' spinner and error handling (added loadError state to hook; skeleton loader when loading; error toast with retry button)
 - 3.1: Create .env.development and .env.production templates (frontend: VITE_API_URL, VITE_GOOGLE_CLIENT_ID, VITE_APP_NAME, VITE_FRONTEND_THEME; backend: GOOGLE_CLIENT_ID, JWT_SECRET_KEY, FRONTEND_URL)
+- 3.2: Make npm scripts for separate dev and prod modes (dev: vite --mode development; prod: build + preview on port 5000; added build:prod script)
 # (Previous PR completed - kept for archive)
 - 1.1 (OLD): Created backend/database/db.py
 - 1.2 (OLD): Created users table
@@ -42,7 +43,7 @@
 - 2.3: Optional DB migration: add messages.round (INTEGER) (done: true - SKIPPED, frontend grouping is sufficient)
 - 2.4: Add 'Load negotiation' spinner and error handling (done: true)
 - 3.1: Create .env.development and .env.production templates (done: true)
-- 3.2: Make npm scripts for separate dev and prod modes (done: false)
+- 3.2: Make npm scripts for separate dev and prod modes (done: true)
 - 3.3: CI: ensure builds use correct mode for deploys (done: false)
 - 4.1: Manual test: Google auth visual & flows (done: false)
 - 4.2: Manual test: history click-to-load and rounds formatting (done: false)

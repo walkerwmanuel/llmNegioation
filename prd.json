@@ -124,7 +124,7 @@
         {
           "id": "3.2",
           "task": "Make npm scripts for separate dev and prod modes",
-          "done": false,
+          "done": true,
           "details": "Update frontend/package.json scripts: \"dev\": \"vite --mode development\", \"prod\": \"vite build --mode production && vite preview --strictPort --port 5000\". Ensure docs explain how to run both locally.",
           "test_instructions": "Run `npm run dev` and confirm app runs on port 3000 (or configured). Run `npm run prod` and confirm built preview serves the production build."
         },
