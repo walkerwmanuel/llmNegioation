@@ -93,7 +93,7 @@
         {
           "id": "3.1",
           "task": "Create .env.development and .env.production templates",
-          "done": false,
+          "done": true,
           "details": "Add frontend/.env.development and frontend/.env.production with keys: VITE_API_URL, VITE_GOOGLE_CLIENT_ID, VITE_APP_NAME, optionally FRONTEND_THEME. Add backend/.env.development and backend/.env.production with GOOGLE_CLIENT_ID, JWT_SECRET_KEY, FRONTEND_URL.",
           "env_files": {
             "frontend/.env.development": [
