@@ -12,6 +12,8 @@ export interface Message {
   role: string;
   content: string;
   created_at: string;
+  edited_at?: string | null;
+  original_content?: string | null;
 }
 
 export interface NegotiationWithMessages extends Negotiation {

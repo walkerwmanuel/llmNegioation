@@ -33,6 +33,12 @@ type ChatItem =
       side: "left" | "right";
       /** if present, this message was edited; show this old content above the new one */
       prevContent?: string;
+      /** ISO timestamp when message was edited (from DB) */
+      editedAt?: string | null;
+      /** Original content before edits (from DB) */
+      originalContent?: string | null;
+      /** Message ID for API calls */
+      messageId?: number;
     };
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -351,7 +357,13 @@ export default function TextToText() {
    * - For ai_vs_ai: ai_1 message + ai_2 message = 1 round
    * - For human: user message + AI response = 1 round
    */
-  const convertMessagesToRounds = (msgs: { role: string; content: string }[]): ChatItem[] => {
+  const convertMessagesToRounds = (msgs: {
+    id?: number;
+    role: string;
+    content: string;
+    edited_at?: string | null;
+    original_content?: string | null;
+  }[]): ChatItem[] => {
     if (msgs.length === 0) return [];
 
     const chatItems: ChatItem[] = [];
@@ -394,6 +406,9 @@ export default function TextToText() {
         speaker,
         content: msg.content,
         side,
+        messageId: msg.id,
+        editedAt: msg.edited_at,
+        originalContent: msg.original_content,
       });
     });
 
@@ -701,6 +716,8 @@ export default function TextToText() {
                       setDraft("");
                     }}
                     onSave={onSaveEdit}
+                    editedAt={m.editedAt}
+                    originalContent={m.originalContent}
                   />
                 </div>
               )

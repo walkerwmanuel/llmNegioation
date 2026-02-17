@@ -213,7 +213,7 @@
         {
           "id": "5.5",
           "task": "Persist edited transcript versions in negotiation history",
-          "done": false,
+          "done": true,
           "details": "Ensure that when loading negotiation history, edited messages display the latest content while preserving metadata (edited_at). If tooltip enabled, show original content.",
           "test_instructions": "Reload negotiation and verify edited state remains."
         },

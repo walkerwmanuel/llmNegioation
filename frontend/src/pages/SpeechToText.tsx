@@ -660,6 +660,8 @@ export default function SpeechToText() {
                     setDraft("");
                   }}
                   onSave={onSaveEdit}
+                  editedAt={undefined}
+                  originalContent={undefined}
                 />
               </div>
             ))}

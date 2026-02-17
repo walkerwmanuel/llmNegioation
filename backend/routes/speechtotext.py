@@ -1,4 +1,5 @@
 # ====== PACKAGES ======
+from typing import Optional
 from fastapi import APIRouter, File, UploadFile
 import os
 from pydantic import BaseModel
@@ -28,7 +29,7 @@ class TextPrompt(BaseModel):
     text: str
 
 # Store current settings globally
-current_settings: SpeechSettings | None = None
+current_settings: Optional[SpeechSettings] = None
 
 
 @router.post("/speech-to-text/update-settings")
