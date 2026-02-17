@@ -28,27 +28,35 @@ class ApiClient {
     };
 
     // Add Authorization header if token exists and skipAuth is false
-    if (!skipAuth) {
-      const token = this.getToken();
-      if (token) {
-        (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-      }
+    const token = this.getToken();
+    if (!skipAuth && token) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    const url = `${this.baseUrl}${endpoint}`;
+    console.log(`[API] ${fetchOptions.method || 'GET'} ${endpoint}`, {
+      hasToken: !!token,
+      skipAuth,
+    });
+
+    const response = await fetch(url, {
       ...fetchOptions,
       headers,
     });
 
+    console.log(`[API] Response: ${response.status} ${response.statusText} for ${endpoint}`);
+
     // Handle 401 Unauthorized
     if (response.status === 401) {
+      console.warn(`[API] 401 Unauthorized - clearing token for ${endpoint}`);
       this.clearToken();
       window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      throw new Error(error.detail || 'Request failed');
+      console.error(`[API] Error response for ${endpoint}:`, error);
+      throw new Error(error.detail || `HTTP ${response.status}: Request failed`);
     }
 
     return response.json();

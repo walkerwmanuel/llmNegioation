@@ -38,18 +38,29 @@ export function useNegotiationSession() {
 
   const loadNegotiation = useCallback(
     async (id: number): Promise<NegotiationWithMessages | null> => {
-      if (!isAuthenticated) return null;
+      console.log(`[loadNegotiation] Starting load for negotiation_id=${id}, isAuthenticated=${isAuthenticated}`);
+
+      if (!isAuthenticated) {
+        console.warn(`[loadNegotiation] Aborting: user not authenticated`);
+        return null;
+      }
 
       setIsLoading(true);
       setLoadError(null);
       try {
+        console.log(`[loadNegotiation] Fetching negotiation_id=${id} from API...`);
         const negotiation: NegotiationWithMessages = await getNegotiation(id);
+        console.log(`[loadNegotiation] Success: loaded negotiation_id=${negotiation.id} with ${negotiation.messages?.length ?? 0} messages`);
         setCurrentNegotiationId(negotiation.id);
-        setMessages(negotiation.messages);
+        setMessages(negotiation.messages || []);
         return negotiation;
-      } catch (error) {
-        console.error('Failed to load negotiation:', error);
-        setLoadError('Failed to load negotiation. Please try again.');
+      } catch (error: any) {
+        const errorMessage = error?.message || 'Unknown error';
+        console.error(`[loadNegotiation] FAILED for negotiation_id=${id}:`, {
+          message: errorMessage,
+          error,
+        });
+        setLoadError(`Failed to load negotiation (ID: ${id}). ${errorMessage}`);
         return null;
       } finally {
         setIsLoading(false);

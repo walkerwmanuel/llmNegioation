@@ -327,6 +327,7 @@ export default function TextToText() {
 
   // Handle selecting a negotiation from sidebar
   const handleSelectNegotiation = async (id: number) => {
+    console.log(`[handleSelectNegotiation] User clicked negotiation_id=${id}`);
     setErr(null);
     setMessages([]);
     setPaused(false);
@@ -338,9 +339,19 @@ export default function TextToText() {
 
     // Convert loaded messages to ChatItem format with round grouping
     if (negotiation && negotiation.messages) {
+      console.log(`[handleSelectNegotiation] Converting ${negotiation.messages.length} messages to rounds`);
       const chatItems = convertMessagesToRounds(negotiation.messages);
       setMessages(chatItems);
       setPendingLoadId(null);
+    } else if (negotiation && !negotiation.messages) {
+      // Negotiation loaded but has no messages (empty negotiation)
+      console.log(`[handleSelectNegotiation] Negotiation loaded but empty (no messages)`);
+      setMessages([]);
+      setPendingLoadId(null);
+    } else {
+      // negotiation is null - failed to load, error already set by hook
+      console.warn(`[handleSelectNegotiation] Failed to load negotiation_id=${id}`);
+      // Keep pendingLoadId set so retry can work
     }
   };
 

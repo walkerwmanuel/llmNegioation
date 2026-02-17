@@ -220,7 +220,7 @@
         {
           "id": "5.6",
           "task": "Investigate bug: some negotiations do not load when clicked",
-          "done": false,
+          "done": true,
           "details": "Add logging and diagnostics to identify why certain negotiations fail to load. Possible causes to check: missing messages, stale IDs, auth mismatch, race conditions, API errors. Log negotiation_id and response status.",
           "test_instructions": "Attempt to load failing negotiations and verify logs capture failure cause."
         },

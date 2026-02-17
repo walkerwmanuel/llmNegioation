@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
@@ -8,6 +9,8 @@ from database.negotiation_repository import (
     get_negotiation_with_messages,
     delete_negotiation
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/negotiations", tags=["negotiations"])
 
@@ -40,10 +43,16 @@ async def get_negotiation(
     user_id: int = Depends(get_current_user)
 ):
     """Get a specific negotiation with its messages"""
+    logger.info(f"[get_negotiation] Loading negotiation_id={negotiation_id} for user_id={user_id}")
+
     negotiation = get_negotiation_with_messages(negotiation_id, user_id)
 
     if not negotiation:
-        raise HTTPException(status_code=404, detail="Negotiation not found")
+        logger.warning(f"[get_negotiation] NOT FOUND: negotiation_id={negotiation_id}, user_id={user_id}")
+        raise HTTPException(status_code=404, detail=f"Negotiation {negotiation_id} not found or not owned by user")
+
+    message_count = len(negotiation.get('messages', []))
+    logger.info(f"[get_negotiation] SUCCESS: negotiation_id={negotiation_id} with {message_count} messages")
 
     return negotiation
 
