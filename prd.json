@@ -166,7 +166,7 @@
         {
           "id": "4.4",
           "task": "Commit and tag release",
-          "done": false,
+          "done": true,
           "details": "After all tasks complete, create a release commit with message: \"Complete cleanup & UI polish: auth UI, history interactions, env build scripts\" and tag v1.1.0.",
           "test_instructions": "Verify tag exists and build artifacts are present for prod."
         }
