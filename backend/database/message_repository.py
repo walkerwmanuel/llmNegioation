@@ -47,3 +47,62 @@ def get_messages(negotiation_id: int) -> List[dict]:
     conn.close()
 
     return messages
+
+
+def get_message_by_id(message_id: int) -> dict | None:
+    """Returns a single message by ID"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM messages WHERE id = ?', (message_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    return dict(row) if row else None
+
+
+def update_message_content(message_id: int, new_content: str) -> dict | None:
+    """
+    Updates message content and tracks the edit.
+    On first edit, original_content is preserved.
+    edited_at is always updated.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Get current message
+    cursor.execute('SELECT * FROM messages WHERE id = ?', (message_id,))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        return None
+
+    message = dict(row)
+
+    # If this is the first edit, preserve original content
+    if message.get('original_content') is None:
+        cursor.execute('''
+            UPDATE messages
+            SET content = ?,
+                edited_at = CURRENT_TIMESTAMP,
+                original_content = ?
+            WHERE id = ?
+        ''', (new_content, message['content'], message_id))
+    else:
+        # Subsequent edits just update content and edited_at
+        cursor.execute('''
+            UPDATE messages
+            SET content = ?,
+                edited_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (new_content, message_id))
+
+    conn.commit()
+
+    # Fetch updated message
+    cursor.execute('SELECT * FROM messages WHERE id = ?', (message_id,))
+    updated = dict(cursor.fetchone())
+    conn.close()
+
+    return updated

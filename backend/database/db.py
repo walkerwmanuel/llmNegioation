@@ -47,9 +47,41 @@ def init_db():
             negotiation_id INTEGER REFERENCES negotiations(id) ON DELETE CASCADE,
             role TEXT NOT NULL,
             content TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            edited_at TIMESTAMP,
+            original_content TEXT
         )
     ''')
+
+    conn.commit()
+    conn.close()
+
+    # Run migrations for existing databases
+    run_migrations()
+
+
+def run_migrations():
+    """Run database migrations to add new columns to existing tables"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Check if edited_at column exists in messages table
+    cursor.execute("PRAGMA table_info(messages)")
+    columns = [col[1] for col in cursor.fetchall()]
+
+    if 'edited_at' not in columns:
+        try:
+            cursor.execute('ALTER TABLE messages ADD COLUMN edited_at TIMESTAMP')
+            print("Migration: Added edited_at column to messages table")
+        except Exception as e:
+            print(f"Migration warning (edited_at): {e}")
+
+    if 'original_content' not in columns:
+        try:
+            cursor.execute('ALTER TABLE messages ADD COLUMN original_content TEXT')
+            print("Migration: Added original_content column to messages table")
+        except Exception as e:
+            print(f"Migration warning (original_content): {e}")
 
     conn.commit()
     conn.close()
