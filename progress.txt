@@ -2,7 +2,7 @@
 # Ralph will update this file after completing each task
 
 ## Current Phase: TRANSCRIPT_EDITS_AND_HISTORY_RELIABILITY
-## Current Task: 5.4
+## Current Task: 5.5
 
 ## Completed Tasks:
 - 1.1: Make SignInButton adopt theme variables (added CSS variables --color-primary, --color-accent, --color-muted, --auth-bg, --auth-fg to home.css; wrapped GoogleLogin in themed container with prop overrides)
@@ -22,6 +22,7 @@
 - 5.1: Allow transcript messages to be edited in UI (edit button on all messages via ChatBubble; inline textarea with Save/Cancel; local state updates immediately)
 - 5.2: Add database support for edited messages (added edited_at TIMESTAMP and original_content TEXT columns; migration script; update_message_content function preserves original)
 - 5.3: Create backend endpoint to update message content (PATCH /api/messages/:id; verifies ownership via negotiation; returns updated message)
+- 5.4: Show edited indicator in negotiation history (ChatBubble shows "(edited)" label; click to toggle original content tooltip)
 # (Previous PR completed - kept for archive)
 - 1.1 (OLD): Created backend/database/db.py
 - 1.2 (OLD): Created users table

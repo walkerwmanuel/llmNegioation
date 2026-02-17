@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "./ui/Button";
 import { colors } from "./ui/colors";
 
@@ -31,6 +32,21 @@ function Avatar({ name, side }: { name: string; side: "left" | "right" }) {
   );
 }
 
+interface ChatBubbleProps {
+  name: string;
+  content: string;
+  side: "left" | "right";
+  isEditing: boolean;
+  onEdit: () => void;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  /** ISO timestamp when message was edited (if edited) */
+  editedAt?: string | null;
+  /** Original content before any edits (for tooltip) */
+  originalContent?: string | null;
+}
+
 export default function ChatBubble({
   name,
   content,
@@ -40,16 +56,12 @@ export default function ChatBubble({
   onChange,
   onSave,
   onCancel,
-}: {
-  name: string;
-  content: string;
-  side: "left" | "right";
-  isEditing: boolean;
-  onEdit: () => void;
-  onChange: (v: string) => void;
-  onSave: () => void;
-  onCancel: () => void;
-}) {
+  editedAt,
+  originalContent,
+}: ChatBubbleProps) {
+  const [showOriginal, setShowOriginal] = useState(false);
+  const isEdited = !!editedAt;
+
   return (
     <div
       style={{
@@ -82,7 +94,23 @@ export default function ChatBubble({
             fontSize: 12,
           }}
         >
-          <div style={{ flex: 1 }}>{name}</div>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
+            {name}
+            {isEdited && (
+              <span
+                style={{
+                  fontSize: 10,
+                  color: colors.muted,
+                  opacity: 0.7,
+                  cursor: originalContent ? "pointer" : "default",
+                }}
+                title={originalContent ? "Click to see original" : undefined}
+                onClick={() => originalContent && setShowOriginal(!showOriginal)}
+              >
+                (edited)
+              </span>
+            )}
+          </div>
           {!isEditing ? (
             <button
               title="Edit message"
@@ -103,6 +131,24 @@ export default function ChatBubble({
           )}
         </div>
 
+        {/* Show original content tooltip */}
+        {showOriginal && originalContent && (
+          <div
+            style={{
+              marginBottom: 8,
+              padding: 8,
+              borderRadius: 6,
+              background: "rgba(0,0,0,0.2)",
+              fontSize: 12,
+              color: colors.muted,
+              borderLeft: `2px solid ${colors.muted}`,
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Original:</div>
+            <div style={{ whiteSpace: "pre-wrap", opacity: 0.8 }}>{originalContent}</div>
+          </div>
+        )}
+
         {!isEditing ? (
           <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{content}</div>
         ) : (
@@ -110,7 +156,7 @@ export default function ChatBubble({
             value={content}
             onChange={(e) => onChange(e.target.value)}
             style={{
-              width: "100%",    // NEIL CHANGE
+              width: "100%",
               minHeight: "150px",
               padding: 8,
               borderRadius: 8,

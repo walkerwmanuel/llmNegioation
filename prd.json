@@ -206,7 +206,7 @@
         {
           "id": "5.4",
           "task": "Show edited indicator in negotiation history",
-          "done": false,
+          "done": true,
           "details": "Display '(edited)' label next to edited messages. Optionally allow hover tooltip to show original content.",
           "test_instructions": "Edit a message and verify indicator appears in negotiation view and history."
         },
