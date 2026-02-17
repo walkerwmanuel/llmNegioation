@@ -37,7 +37,7 @@
         {
           "id": "1.2",
           "task": "Add subtle animations and accessible focus states to AuthButton",
-          "done": false,
+          "done": true,
           "details": "Add a 150ms scale and shadow animation on hover/focus. Ensure keyboard focus is visible and ARIA attributes present.",
           "test_instructions": "Tab to AuthButton; verify focus ring; hover to see animation."
         },

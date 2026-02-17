@@ -2,10 +2,11 @@
 # Ralph will update this file after completing each task
 
 ## Current Phase: FRONTEND_AUTH_UI_POLISH
-## Current Task: 1.2
+## Current Task: 1.3
 
 ## Completed Tasks:
 - 1.1: Make SignInButton adopt theme variables (added CSS variables --color-primary, --color-accent, --color-muted, --auth-bg, --auth-fg to home.css; wrapped GoogleLogin in themed container with prop overrides)
+- 1.2: Add subtle animations and accessible focus states to AuthButton (150ms scale/shadow animations on hover/focus; ARIA attributes added; keyboard focus visible with outline)
 # (Previous PR completed - kept for archive)
 - 1.1 (OLD): Created backend/database/db.py
 - 1.2 (OLD): Created users table
@@ -28,7 +29,7 @@
 
 ## New Tasks Pending:
 - 1.1: Make SignInButton adopt theme variables (done: true)
-- 1.2: Add subtle animations and accessible focus states to AuthButton (done: false)
+- 1.2: Add subtle animations and accessible focus states to AuthButton (done: true)
 - 1.3: Expose theme colors to backend-configurable override (done: false)
 - 2.1: Make ChatHistorySidebar list items clickable to load negotiation (done: false)
 - 2.2: Format loaded negotiation into rounds in UI (done: false)
