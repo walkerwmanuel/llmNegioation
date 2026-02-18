@@ -751,24 +751,10 @@ export default function TextToText() {
     <>
       <Button variant="outline" onClick={() => setOpenSettings(false)}>Cancel</Button>
       <Button
-        onClick={async () => {
+        onClick={() => {
           setOpenSettings(false);
-          try {
-            const res = await fetch(API_URL + "/update-settings", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(form),
-            });
-
-            if (!res.ok) {
-              throw new Error(`Failed to update backend settings (status ${res.status})`);
-            }
-
-            console.log("Settings saved to backend:", form);
-          } catch (err) {
-            console.error("Saved settings successfully:", err);
-            alert("Settings saved successfully.");
-          }
+          // Settings are stored in local state (form) and passed directly
+          // to the API via buildPayload when starting a negotiation
         }}
       >
         Save
