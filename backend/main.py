@@ -8,6 +8,7 @@ from routes.speechtotext import router as speech_router
 from routes.auth_routes import router as auth_router
 from routes.negotiation_routes import router as negotiation_router
 from routes.message_routes import router as message_router
+from routes.realtime import router as realtime_router
 from database.db import init_db
 
 
@@ -43,6 +44,8 @@ app.include_router(speech_router)
 app.include_router(auth_router)
 app.include_router(negotiation_router)
 app.include_router(message_router)
+app.include_router(realtime_router)
+
 
 
 @app.get("/")
