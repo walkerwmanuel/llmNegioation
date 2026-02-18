@@ -136,10 +136,10 @@ function RoundDivider({ round }: { round: number }) {
 export default function TextToText() {
   const defaults: FormState = useMemo(
     () => ({
-      model: "gpt-4o-mini",
+      model: "gpt-5.2",
       topic: "How much phone usage should middle and high school students be allowed during school hours?",
       rules:
-        "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn.\n2) Address the topic directly; cite concrete practices, examples, or trade-offs.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) If referencing evidence, summarize briefly rather than citing sources.",
+        "NEGOTIATION RULES:\n1) Respond in up to five sentences per turn. Make sure responses are emotional, realistic, and as human as possible.\n2) Address the topic directly; cite concrete practices, examples, or trade-offs.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) If referencing evidence, summarize briefly rather than citing sources.",
       rounds: 4,
       agent1: {
         name: "Dr. Carter",
@@ -490,6 +490,7 @@ export default function TextToText() {
                     name={m.speaker}
                     content={editingIndex === i ? draft : m.content}
                     side={m.side}
+                    tone={m.tone}
                     isEditing={editingIndex === i}
                     isSpeaking={loading && currentSpeaker === m.speaker}
                     onEdit={() => {
