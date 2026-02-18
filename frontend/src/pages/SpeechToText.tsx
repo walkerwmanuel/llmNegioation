@@ -111,9 +111,14 @@ export default function SpeechToText() {
   const maxTimeoutRef = useRef<number | null>(null);
   const [sendingToBot, setSendingToBot] = useState(false);
 
-  const TRANSCRIBE_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/transcribe";
-  const RESPOND_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/respond";
-  const SETTINGS_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/update-settings";
+  //const TRANSCRIBE_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/transcribe";
+  //const RESPOND_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/respond";
+  //const SETTINGS_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/update-settings";
+
+  const TRANSCRIBE_URL = "http://127.0.0.1:8025/speech-to-text/transcribe";
+  const RESPOND_URL    = "http://127.0.0.1:8025/speech-to-text/respond";
+  const SETTINGS_URL   = "http://127.0.0.1:8025/speech-to-text/update-settings";
+
 
 
   // Auto-scroll chat
@@ -753,11 +758,38 @@ export default function SpeechToText() {
         >
           {/* Model */}
           <div style={{ marginBottom: 12 }}>
-            <Input
-              label="Model"
+            <label style={{ fontSize: 12, color: colors.muted }}>Model</label>
+            <select
               value={form.model}
               onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-            />
+              style={{
+                width: "100%",
+                marginTop: 4,
+                padding: "8px 10px",
+                borderRadius: 6,
+                border: `1px solid ${colors.border}`,
+                background: colors.panelAlt,
+                color: colors.text,
+              }}
+            >
+              {/* OpenAI */}
+              <option value="gpt-4o-mini">gpt-4o-mini</option>
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-5-mini">gpt-5-mini</option>
+              <option value="gpt-5.2">gpt-5.2</option>
+
+              {/* DeepSeek */}
+              <option value="deepseek-chat">deepseek-chat</option>
+
+              {/* Grok (use the exact IDs your backend supports) */}
+              <option value="grok-4-1-fast-non-reasoning">grok-4-1-fast-non-reasoning</option>
+              <option value="grok-4-1-fast-reasoning">grok-4-1-fast-reasoning</option>
+
+              {/* Gemini */}
+              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+              <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+            </select>
           </div>
 
           {/* Topic */}

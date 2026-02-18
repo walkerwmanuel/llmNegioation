@@ -11,7 +11,10 @@ import json
 # ====== FETCH KEY ======
 router = APIRouter()
 
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 class BotConfig(BaseModel):
     name: str

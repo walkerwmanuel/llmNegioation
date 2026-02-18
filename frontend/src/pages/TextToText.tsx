@@ -32,7 +32,8 @@ type ChatItem =
       prevContent?: string;
     };
 
-const API_URL = "https://bag-vii-yang-concert.trycloudflare.com/t2t-negotiate";
+//const API_URL = "https://bag-vii-yang-concert.trycloudflare.com/t2t-negotiate";
+const API_URL = "http://127.0.0.1:8025/t2t-negotiate";
 
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
@@ -561,6 +562,13 @@ export default function TextToText() {
     <option value="gpt-5-nano">gpt-5-nano</option>
     <option value="gpt-5-mini">gpt-5-mini</option>
     <option value="gpt-5.2">gpt-5.2</option>
+    <option value="deepseek-chat">deepseek-chat</option>
+    <option value="grok-4-1-fast-non-reasoning">grok-4-1-fast-non-reasoning</option>
+    <option value="grok-4-1-fast-reasoning">grok-4-1-fast-reasoning</option>
+    <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+    <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+
   </select>
 </div>
 

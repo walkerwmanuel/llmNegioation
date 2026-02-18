@@ -7,3 +7,4 @@ httpx
 openai
 boto3
 python-multipart
+google-genai
