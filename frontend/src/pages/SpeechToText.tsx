@@ -33,7 +33,7 @@ type ChatItem = {
 export default function SpeechToText() {
   const defaults: FormState = useMemo(
     () => ({
-      model: "gpt-4o-mini",
+      model: "gpt-5.2",
       topic: "Negotiation over the price of Emily's used car.",
       rules:
         "NEGOTIATION RULES:\n1) Respond in up to five sentences per turn after your introduction. Make sure responses are emotional, realistic, and has human as possible.\n2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.",
