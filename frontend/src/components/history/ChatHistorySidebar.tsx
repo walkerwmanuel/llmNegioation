@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getNegotiations, deleteNegotiation } from '../../api/negotiations';
 import type { Negotiation } from '../../types/negotiation';
@@ -8,17 +8,26 @@ interface ChatHistorySidebarProps {
   onSelectNegotiation: (id: number) => void;
   selectedId: number | null;
   onNewNegotiation: () => void;
+  /** Filter negotiations by type: 'ai_vs_ai' for TextToText, 'user_vs_ai' for SpeechToText */
+  negotiationType?: string;
 }
 
 export function ChatHistorySidebar({
   onSelectNegotiation,
   selectedId,
   onNewNegotiation,
+  negotiationType,
 }: ChatHistorySidebarProps) {
   const { isAuthenticated } = useAuth();
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Filter negotiations by type if specified
+  const filteredNegotiations = useMemo(() => {
+    if (!negotiationType) return negotiations;
+    return negotiations.filter((n) => n.negotiation_type === negotiationType);
+  }, [negotiations, negotiationType]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -149,12 +158,12 @@ export function ChatHistorySidebar({
               }
             `}</style>
           </div>
-        ) : negotiations.length === 0 ? (
+        ) : filteredNegotiations.length === 0 ? (
           <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
             No negotiations yet. Start a new one!
           </div>
         ) : (
-          negotiations.map((negotiation) => (
+          filteredNegotiations.map((negotiation) => (
             <NegotiationListItem
               key={negotiation.id}
               negotiation={negotiation}

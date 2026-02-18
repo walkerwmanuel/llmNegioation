@@ -579,6 +579,7 @@ export default function TextToText() {
       onSelectNegotiation={handleSelectNegotiation}
       selectedId={currentNegotiationId}
       onNewNegotiation={handleNewNegotiation}
+      negotiationType="ai_vs_ai"
     >
     <div style={{ width: "100%", height: "100%", padding: "20px", color: colors.text, display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>

@@ -7,6 +7,8 @@ interface NegotiationLayoutProps {
   onSelectNegotiation: (id: number) => void;
   selectedId: number | null;
   onNewNegotiation: () => void;
+  /** Filter negotiations by type: 'ai_vs_ai' for TextToText, 'user_vs_ai' for SpeechToText */
+  negotiationType?: string;
 }
 
 export function NegotiationLayout({
@@ -14,6 +16,7 @@ export function NegotiationLayout({
   onSelectNegotiation,
   selectedId,
   onNewNegotiation,
+  negotiationType,
 }: NegotiationLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -103,6 +106,7 @@ export function NegotiationLayout({
             onNewNegotiation();
             if (isMobile) setIsSidebarOpen(false);
           }}
+          negotiationType={negotiationType}
         />
       </div>
 

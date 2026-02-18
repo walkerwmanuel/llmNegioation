@@ -528,6 +528,7 @@ export default function SpeechToText() {
       onSelectNegotiation={handleSelectNegotiation}
       selectedId={currentNegotiationId}
       onNewNegotiation={handleNewNegotiation}
+      negotiationType="user_vs_ai"
     >
       <style>{spinnerKeyframes}</style>
       <div
