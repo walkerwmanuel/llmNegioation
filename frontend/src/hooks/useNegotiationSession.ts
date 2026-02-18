@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { createNegotiation, getNegotiation, addMessage } from '../api/negotiations';
 import type { Message, NegotiationWithMessages } from '../types/negotiation';
@@ -9,6 +9,9 @@ export function useNegotiationSession() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Track the latest request to handle race conditions
+  const loadRequestIdRef = useRef(0);
 
   const startNewNegotiation = useCallback(
     async (topic: string, negotiation_type: string) => {
@@ -38,7 +41,9 @@ export function useNegotiationSession() {
 
   const loadNegotiation = useCallback(
     async (id: number): Promise<NegotiationWithMessages | null> => {
-      console.log(`[loadNegotiation] Starting load for negotiation_id=${id}, isAuthenticated=${isAuthenticated}`);
+      // Increment request ID to track this specific request
+      const requestId = ++loadRequestIdRef.current;
+      console.log(`[loadNegotiation] Starting load for negotiation_id=${id}, requestId=${requestId}, isAuthenticated=${isAuthenticated}`);
 
       if (!isAuthenticated) {
         console.warn(`[loadNegotiation] Aborting: user not authenticated`);
@@ -47,14 +52,32 @@ export function useNegotiationSession() {
 
       setIsLoading(true);
       setLoadError(null);
+
       try {
         console.log(`[loadNegotiation] Fetching negotiation_id=${id} from API...`);
         const negotiation: NegotiationWithMessages = await getNegotiation(id);
+
+        // Check if this request is still the latest one (race condition protection)
+        if (requestId !== loadRequestIdRef.current) {
+          console.log(`[loadNegotiation] Discarding stale response for negotiation_id=${id}, requestId=${requestId} (current=${loadRequestIdRef.current})`);
+          return null;
+        }
+
         console.log(`[loadNegotiation] Success: loaded negotiation_id=${negotiation.id} with ${negotiation.messages?.length ?? 0} messages`);
+
+        // Ensure messages array exists and is valid
+        const safeMessages = Array.isArray(negotiation.messages) ? negotiation.messages : [];
+
         setCurrentNegotiationId(negotiation.id);
-        setMessages(negotiation.messages || []);
-        return negotiation;
+        setMessages(safeMessages);
+        return { ...negotiation, messages: safeMessages };
       } catch (error: any) {
+        // Check if this request is still the latest one
+        if (requestId !== loadRequestIdRef.current) {
+          console.log(`[loadNegotiation] Discarding stale error for negotiation_id=${id}`);
+          return null;
+        }
+
         const errorMessage = error?.message || 'Unknown error';
         console.error(`[loadNegotiation] FAILED for negotiation_id=${id}:`, {
           message: errorMessage,
@@ -63,7 +86,10 @@ export function useNegotiationSession() {
         setLoadError(`Failed to load negotiation (ID: ${id}). ${errorMessage}`);
         return null;
       } finally {
-        setIsLoading(false);
+        // Only clear loading state if this is still the latest request
+        if (requestId === loadRequestIdRef.current) {
+          setIsLoading(false);
+        }
       }
     },
     [isAuthenticated]

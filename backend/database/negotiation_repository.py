@@ -73,14 +73,17 @@ def get_negotiation_with_messages(negotiation_id: int, user_id: int) -> Optional
 
     negotiation = dict(negotiation_row)
 
-    # Get messages
+    # Get messages (always returns an array, even if empty)
     cursor.execute('''
-        SELECT * FROM messages
+        SELECT id, negotiation_id, role, content, created_at, edited_at, original_content
+        FROM messages
         WHERE negotiation_id = ?
         ORDER BY created_at ASC
     ''', (negotiation_id,))
 
-    negotiation['messages'] = [dict(row) for row in cursor.fetchall()]
+    messages_rows = cursor.fetchall()
+    # Always ensure messages is an array (never None)
+    negotiation['messages'] = [dict(row) for row in messages_rows] if messages_rows else []
     conn.close()
 
     return negotiation

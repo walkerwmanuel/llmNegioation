@@ -227,7 +227,7 @@
         {
           "id": "5.7",
           "task": "Fix negotiation loading reliability",
-          "done": false,
+          "done": true,
           "details": "Based on findings from 5.6, implement fixes. Ensure: correct user ownership checks, fallback UI for empty negotiations, retry logic, and defensive null handling. Ensure no negotiation silently fails to load.",
           "test_instructions": "Create multiple negotiations and confirm all load correctly across sessions and browsers."
         },
