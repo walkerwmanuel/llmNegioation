@@ -35,6 +35,7 @@ def init_db():
             user_id INTEGER REFERENCES users(id),
             topic TEXT NOT NULL,
             negotiation_type TEXT NOT NULL,
+            settings TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -67,21 +68,32 @@ def run_migrations():
 
     # Check if edited_at column exists in messages table
     cursor.execute("PRAGMA table_info(messages)")
-    columns = [col[1] for col in cursor.fetchall()]
+    message_columns = [col[1] for col in cursor.fetchall()]
 
-    if 'edited_at' not in columns:
+    if 'edited_at' not in message_columns:
         try:
             cursor.execute('ALTER TABLE messages ADD COLUMN edited_at TIMESTAMP')
             print("Migration: Added edited_at column to messages table")
         except Exception as e:
             print(f"Migration warning (edited_at): {e}")
 
-    if 'original_content' not in columns:
+    if 'original_content' not in message_columns:
         try:
             cursor.execute('ALTER TABLE messages ADD COLUMN original_content TEXT')
             print("Migration: Added original_content column to messages table")
         except Exception as e:
             print(f"Migration warning (original_content): {e}")
+
+    # Check if settings column exists in negotiations table
+    cursor.execute("PRAGMA table_info(negotiations)")
+    negotiation_columns = [col[1] for col in cursor.fetchall()]
+
+    if 'settings' not in negotiation_columns:
+        try:
+            cursor.execute('ALTER TABLE negotiations ADD COLUMN settings TEXT')
+            print("Migration: Added settings column to negotiations table")
+        except Exception as e:
+            print(f"Migration warning (settings): {e}")
 
     conn.commit()
     conn.close()

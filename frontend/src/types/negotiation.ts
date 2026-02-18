@@ -1,7 +1,23 @@
+export interface AgentSettings {
+  name: string;
+  persona: string;
+  stance: string;
+}
+
+export interface NegotiationSettings {
+  model: string;
+  topic: string;
+  rules: string;
+  rounds: number;
+  agent1: AgentSettings;
+  agent2: AgentSettings;
+}
+
 export interface Negotiation {
   id: number;
   topic: string;
   negotiation_type: string;
+  settings?: NegotiationSettings | null;
   created_at: string;
   updated_at: string;
 }

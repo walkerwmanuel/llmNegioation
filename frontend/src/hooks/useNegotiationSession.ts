@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { createNegotiation, getNegotiation, addMessage } from '../api/negotiations';
-import type { Message, NegotiationWithMessages } from '../types/negotiation';
+import { createNegotiation, getNegotiation, addMessage, updateNegotiationSettings } from '../api/negotiations';
+import type { Message, NegotiationWithMessages, NegotiationSettings } from '../types/negotiation';
 
 export function useNegotiationSession() {
   const { isAuthenticated } = useAuth();
@@ -14,7 +14,7 @@ export function useNegotiationSession() {
   const loadRequestIdRef = useRef(0);
 
   const startNewNegotiation = useCallback(
-    async (topic: string, negotiation_type: string) => {
+    async (topic: string, negotiation_type: string, settings?: NegotiationSettings) => {
       if (!isAuthenticated) {
         setCurrentNegotiationId(null);
         setMessages([]);
@@ -24,7 +24,7 @@ export function useNegotiationSession() {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const negotiation = await createNegotiation(topic, negotiation_type);
+        const negotiation = await createNegotiation(topic, negotiation_type, settings);
         setCurrentNegotiationId(negotiation.id);
         setMessages([]);
         return negotiation.id;
@@ -144,6 +144,27 @@ export function useNegotiationSession() {
     setLoadError(null);
   }, []);
 
+  const updateSettings = useCallback(
+    async (settings: NegotiationSettings, negotiationIdOverride?: number) => {
+      const negId = negotiationIdOverride ?? currentNegotiationId;
+
+      if (!isAuthenticated || !negId) {
+        console.warn('[updateSettings] Cannot update: not authenticated or no negotiation ID');
+        return null;
+      }
+
+      try {
+        const negotiation = await updateNegotiationSettings(negId, settings);
+        console.log(`[updateSettings] Updated settings for negotiation_id=${negId}`);
+        return negotiation;
+      } catch (error) {
+        console.error('Failed to update settings:', error);
+        return null;
+      }
+    },
+    [isAuthenticated, currentNegotiationId]
+  );
+
   return {
     currentNegotiationId,
     messages,
@@ -152,6 +173,7 @@ export function useNegotiationSession() {
     startNewNegotiation,
     loadNegotiation,
     saveMessage,
+    updateSettings,
     clearSession,
     clearError,
   };

@@ -1,23 +1,31 @@
+import json
 from typing import Optional, List
 from database.db import get_db_connection
 
 
-def create_negotiation(user_id: int, topic: str, negotiation_type: str) -> dict:
+def create_negotiation(user_id: int, topic: str, negotiation_type: str, settings: Optional[dict] = None) -> dict:
     """Creates a new negotiation and returns it with id"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    settings_json = json.dumps(settings) if settings else None
+
     cursor.execute('''
-        INSERT INTO negotiations (user_id, topic, negotiation_type)
-        VALUES (?, ?, ?)
-    ''', (user_id, topic, negotiation_type))
+        INSERT INTO negotiations (user_id, topic, negotiation_type, settings)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, topic, negotiation_type, settings_json))
 
     conn.commit()
     negotiation_id = cursor.lastrowid
 
     cursor.execute('SELECT * FROM negotiations WHERE id = ?', (negotiation_id,))
-    negotiation = dict(cursor.fetchone())
+    row = cursor.fetchone()
+    negotiation = dict(row)
     conn.close()
+
+    # Parse settings JSON back to dict
+    if negotiation.get('settings'):
+        negotiation['settings'] = json.loads(negotiation['settings'])
 
     return negotiation
 
@@ -73,6 +81,13 @@ def get_negotiation_with_messages(negotiation_id: int, user_id: int) -> Optional
 
     negotiation = dict(negotiation_row)
 
+    # Parse settings JSON if present
+    if negotiation.get('settings'):
+        try:
+            negotiation['settings'] = json.loads(negotiation['settings'])
+        except json.JSONDecodeError:
+            negotiation['settings'] = None
+
     # Get messages (always returns an array, even if empty)
     cursor.execute('''
         SELECT id, negotiation_id, role, content, created_at, edited_at, original_content
@@ -85,6 +100,37 @@ def get_negotiation_with_messages(negotiation_id: int, user_id: int) -> Optional
     # Always ensure messages is an array (never None)
     negotiation['messages'] = [dict(row) for row in messages_rows] if messages_rows else []
     conn.close()
+
+    return negotiation
+
+
+def update_negotiation_settings(negotiation_id: int, user_id: int, settings: dict) -> Optional[dict]:
+    """Updates negotiation settings if owned by user. Returns updated negotiation or None."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    settings_json = json.dumps(settings)
+
+    cursor.execute('''
+        UPDATE negotiations
+        SET settings = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+    ''', (settings_json, negotiation_id, user_id))
+
+    conn.commit()
+
+    if cursor.rowcount == 0:
+        conn.close()
+        return None
+
+    cursor.execute('SELECT * FROM negotiations WHERE id = ?', (negotiation_id,))
+    row = cursor.fetchone()
+    negotiation = dict(row)
+    conn.close()
+
+    # Parse settings JSON back to dict
+    if negotiation.get('settings'):
+        negotiation['settings'] = json.loads(negotiation['settings'])
 
     return negotiation
 

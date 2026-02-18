@@ -190,9 +190,20 @@ export default function TextToText() {
     startNewNegotiation,
     loadNegotiation,
     saveMessage,
+    updateSettings,
     clearSession,
     clearError: clearNegotiationError,
   } = useNegotiationSession();
+
+  // Helper to convert form state to NegotiationSettings
+  const getSettingsFromForm = () => ({
+    model: form.model,
+    topic: form.topic,
+    rules: form.rules,
+    rounds: form.rounds,
+    agent1: { name: form.agent1.name, persona: form.agent1.persona, stance: form.agent1.stance },
+    agent2: { name: form.agent2.name, persona: form.agent2.persona, stance: form.agent2.stance },
+  });
 
   // Track which negotiation ID we're trying to load (for retry)
   const [pendingLoadId, setPendingLoadId] = useState<number | null>(null);
@@ -279,7 +290,7 @@ export default function TextToText() {
     // Start a new negotiation in the backend if authenticated
     let negId: number | null = null;
     if (isAuthenticated) {
-      negId = await startNewNegotiation(form.topic, 'ai_vs_ai');
+      negId = await startNewNegotiation(form.topic, 'ai_vs_ai', getSettingsFromForm());
     }
 
     // Build the system prompt for display
@@ -346,11 +357,41 @@ export default function TextToText() {
       const chatItems = convertMessagesToRounds(negotiation.messages);
       setMessages(chatItems);
       setPendingLoadId(null);
+
+      // Restore settings from negotiation if available
+      if (negotiation.settings) {
+        console.log(`[handleSelectNegotiation] Restoring settings from negotiation`);
+        setForm({
+          model: negotiation.settings.model || form.model,
+          topic: negotiation.settings.topic || negotiation.topic,
+          rules: negotiation.settings.rules || form.rules,
+          rounds: negotiation.settings.rounds || form.rounds,
+          agent1: negotiation.settings.agent1 || form.agent1,
+          agent2: negotiation.settings.agent2 || form.agent2,
+        });
+      }
+
+      // Enable Resume if there are messages
+      if (chatItems.length > 0) {
+        setPaused(true);
+      }
     } else if (negotiation && !negotiation.messages) {
       // Negotiation loaded but has no messages (empty negotiation)
       console.log(`[handleSelectNegotiation] Negotiation loaded but empty (no messages)`);
       setMessages([]);
       setPendingLoadId(null);
+
+      // Restore settings even for empty negotiations
+      if (negotiation.settings) {
+        setForm({
+          model: negotiation.settings.model || form.model,
+          topic: negotiation.settings.topic || negotiation.topic,
+          rules: negotiation.settings.rules || form.rules,
+          rounds: negotiation.settings.rounds || form.rounds,
+          agent1: negotiation.settings.agent1 || form.agent1,
+          agent2: negotiation.settings.agent2 || form.agent2,
+        });
+      }
     } else {
       // negotiation is null - failed to load, error already set by hook
       console.warn(`[handleSelectNegotiation] Failed to load negotiation_id=${id}`);
@@ -452,17 +493,28 @@ export default function TextToText() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
+    // Update settings in database if we have a negotiation ID (in case user changed rounds, etc.)
+    const negId = currentNegotiationId;
+    if (isAuthenticated && negId) {
+      await updateSettings(getSettingsFromForm(), negId);
+    }
+
     setLastPromptSent(`Resuming from existing transcript:\n${transcript}`);
-  
+
     try {
       await postStream(
         API_URL,
         buildPayload({ transcript, form }),
-        (msg) => {
+        async (msg) => {
           if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
           if (msg.type === "turn") {
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
+            // Save new messages to database
+            if (negId) {
+              const role = side === "left" ? "ai_1" : "ai_2";
+              await saveMessage(role, msg.content, negId);
+            }
           }
         },
         controller.signal

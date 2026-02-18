@@ -1,4 +1,5 @@
 import logging
+from typing import Optional, Any
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
@@ -7,6 +8,7 @@ from database.negotiation_repository import (
     create_negotiation,
     get_user_negotiations,
     get_negotiation_with_messages,
+    update_negotiation_settings,
     delete_negotiation
 )
 
@@ -18,6 +20,11 @@ router = APIRouter(prefix="/api/negotiations", tags=["negotiations"])
 class CreateNegotiationRequest(BaseModel):
     topic: str
     negotiation_type: str
+    settings: Optional[dict] = None
+
+
+class UpdateSettingsRequest(BaseModel):
+    settings: dict
 
 
 @router.get("")
@@ -33,7 +40,7 @@ async def create_new_negotiation(
     user_id: int = Depends(get_current_user)
 ):
     """Create a new negotiation"""
-    negotiation = create_negotiation(user_id, request.topic, request.negotiation_type)
+    negotiation = create_negotiation(user_id, request.topic, request.negotiation_type, request.settings)
     return negotiation
 
 
@@ -53,6 +60,23 @@ async def get_negotiation(
 
     message_count = len(negotiation.get('messages', []))
     logger.info(f"[get_negotiation] SUCCESS: negotiation_id={negotiation_id} with {message_count} messages")
+
+    return negotiation
+
+
+@router.patch("/{negotiation_id}/settings")
+async def update_settings(
+    negotiation_id: int,
+    request: UpdateSettingsRequest,
+    user_id: int = Depends(get_current_user)
+):
+    """Update negotiation settings"""
+    logger.info(f"[update_settings] Updating settings for negotiation_id={negotiation_id}")
+
+    negotiation = update_negotiation_settings(negotiation_id, user_id, request.settings)
+
+    if not negotiation:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
 
     return negotiation
 
