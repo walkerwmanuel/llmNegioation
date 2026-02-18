@@ -6,10 +6,11 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Textarea } from "../components/ui/Textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/CardBits";
-import ChatBubble from "../components/ChatBubble";
+import ChatBubble, { injectToneEmojis, toneFromText } from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
 import DownloadChatButton from "../components/ui/DownloadChatButton";
+
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -35,7 +36,7 @@ export default function SpeechToText() {
       model: "gpt-4o-mini",
       topic: "Negotiation over the price of Emily's used car.",
       rules:
-        "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn after your introduction.\n2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.",
+        "NEGOTIATION RULES:\n1) Respond in up to five sentences per turn after your introduction. Make sure responses are emotional, realistic, and has human as possible.\n2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.",
       rounds: 4,
       agent1: {
         name: "You",
@@ -364,10 +365,25 @@ export default function SpeechToText() {
         const data = await res.json();
         console.log("Respond response:", data);
 
-        setMessages((prev) => [
-          ...prev,
-          { speaker: form.agent2.name, content: data.bot, side: "right" },
-        ]);
+        const tone = toneFromText(botReply);
+
+const emojiText =
+  injectToneEmojis(
+    botReply,
+    tone,
+    `${botName}::${tone}::${botReply}`
+  );
+
+  setMessages(prev => [
+    ...prev,
+    {
+      speaker: botName,
+      content: botReply,   // raw
+      side: "left",
+      tone: tone,
+    }
+  ]);
+  
       }
     } catch (err: any) {
       console.error("Error saving edit:", err);
@@ -587,22 +603,24 @@ export default function SpeechToText() {
 
               {/* Current message */}
               <ChatBubble
-                name={m.speaker}
-                content={editingIndex === i ? draft : m.content}
-                side={m.side}
-                isEditing={editingIndex === i}
-                onEdit={() => {
-                  setEditingIndex(i);
-                  setDraft(m.content);
-                  setStickToBottom(false);
-                }}
-                onChange={setDraft}
-                onCancel={() => {
-                  setEditingIndex(null);
-                  setDraft("");
-                }}
-                onSave={onSaveEdit}
-              />
+  name={m.speaker}
+  content={editingIndex === i ? draft : m.content}
+  side={m.side}
+  tone={m.tone}
+  isEditing={editingIndex === i}
+  onEdit={() => {
+    setEditingIndex(i);
+    setDraft(m.content);
+    setStickToBottom(false);
+  }}
+  onChange={setDraft}
+  onCancel={() => {
+    setEditingIndex(null);
+    setDraft("");
+  }}
+  onSave={onSaveEdit}
+/>
+
             </div>
           ))}
 

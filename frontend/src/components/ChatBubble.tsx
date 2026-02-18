@@ -199,6 +199,7 @@ function injectToneEmojis(text: string, tone: string | undefined, seedKey: strin
 
 }
 
+
 // ---------------- Tone Detection ----------------
 
 const toneFromText = (
@@ -419,3 +420,4 @@ export default function ChatBubble({
   );
 
 }
+export { injectToneEmojis, toneFromText };
