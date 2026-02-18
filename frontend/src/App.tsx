@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import Home from "./pages/home";
 import TextToText from "./pages/TextToText";
 import SpeechToText from "./pages/SpeechToText";
+import VoiceToVoice from "./pages/VoiceToVoice";
+
 import { AuthButton } from "./components/auth/AuthButton";
 
 export default function App() {
@@ -66,7 +68,9 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/text-to-text" element={<TextToText />} />
         <Route path="/speech-to-text" element={<SpeechToText />} />
+        <Route path="/voice-to-voice" element={<VoiceToVoice />} /> {/* ✅ NEW */}
       </Routes>
+
     </Router>
   );
 }

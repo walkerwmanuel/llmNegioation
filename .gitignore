@@ -1,9 +1,16 @@
-backend/venv
-backend/.env
-*/**/__pycache__
-backend/.venv
-prd.json
-progress.txt
-PROMPT.md
-RALPH_SETUP_GUIDE.md
-.claude
+# Node
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Python
+.venv/
+backend/venv/
+__pycache__/
+
+# Logs
+*.log
+
+# Environment
+.env

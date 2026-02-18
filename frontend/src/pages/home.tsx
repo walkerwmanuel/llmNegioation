@@ -95,6 +95,49 @@ export default function Home() {
       </div>
     </section>
 
+    {/* CTA SECTION — v3 (Voice vs. Voice) */}
+    <section
+      className="container section"
+      style={{
+      marginTop: "-1rem",
+      marginBottom: "0.5rem",
+      }}
+    >
+    <div
+      className="cta-card"
+      style={{
+        textAlign: "center",
+        margin: "1rem 0",
+        padding: "1.25rem",
+        borderRadius: "1rem",
+        background: "rgba(255,255,255,0.06)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        color: "#fff",
+      }}
+  >
+    <h2 style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>
+      🔊 Try Negotiation Bot v3 — Real-Time Voice vs. Voice 🔊
+    </h2>
+    <p className="muted" style={{ marginBottom: "0.75rem", opacity: 0.9 }}>
+      Two-way live voice conversation with advanced negotiation flow visualization.
+    </p>
+    <Link
+      to="/voice-to-voice"
+      className="btn primary"
+      style={{
+        fontSize: "1.1rem",
+        padding: "0.5rem 1.25rem",
+        display: "inline-block",
+        textDecoration: "none",
+      }}
+    >
+      Launch Voice-to-Voice
+    </Link>
+  </div>
+</section>
+
+
 
       {/* HOW IT WORKS */}
       <section id="features" className="container section">
@@ -128,7 +171,9 @@ export default function Home() {
 
           <div className="step-box">
             <div className="badge-num">3</div>
-            <div className="step-title">Real-Time Multimodal (Voice vs. Voice)</div>
+            <Link to="/voice-to-voice" className="step-title">
+              Real-Time Multimodal (Voice vs. Voice)
+            </Link>
             <p className="muted">
               Enable two-way synchronous voice conversation. Provide advanced
               visualization of negotiation/deliberation flow and ensure scalability
@@ -148,5 +193,6 @@ export default function Home() {
         </div>
       </section>
     </>
+    
   );
 }
