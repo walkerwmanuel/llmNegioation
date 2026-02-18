@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from database.db import get_db_connection
 
 
@@ -49,7 +49,7 @@ def get_messages(negotiation_id: int) -> List[dict]:
     return messages
 
 
-def get_message_by_id(message_id: int) -> dict | None:
+def get_message_by_id(message_id: int) -> Optional[dict]:
     """Returns a single message by ID"""
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -61,7 +61,7 @@ def get_message_by_id(message_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def update_message_content(message_id: int, new_content: str) -> dict | None:
+def update_message_content(message_id: int, new_content: str) -> Optional[dict]:
     """
     Updates message content and tracks the edit.
     On first edit, original_content is preserved.
