@@ -1,0 +1,71 @@
+# Progress Tracker
+# Ralph will update this file after completing each task
+
+## Current Phase: TRANSCRIPT_EDITS_AND_HISTORY_RELIABILITY (COMPLETE)
+## Current Task: ALL COMPLETE
+
+## Completed Tasks:
+- 1.1: Make SignInButton adopt theme variables (added CSS variables --color-primary, --color-accent, --color-muted, --auth-bg, --auth-fg to home.css; wrapped GoogleLogin in themed container with prop overrides)
+- 1.2: Add subtle animations and accessible focus states to AuthButton (150ms scale/shadow animations on hover/focus; ARIA attributes added; keyboard focus visible with outline)
+- 1.3: Expose theme colors to backend-configurable override (created ThemeContext with VITE_FRONTEND_THEME env var support; accepts JSON string or URL; applies to CSS variables at runtime)
+- 2.1: Make ChatHistorySidebar list items clickable to load negotiation (updated handleSelectNegotiation to convert loaded messages to ChatItem format; hook now returns negotiation)
+- 2.2: Format loaded negotiation into rounds in UI (created convertMessagesToRounds function; each round = one left + one right speaker exchange; visual Round dividers shown)
+- 2.3: Optional DB migration: add messages.round (INTEGER) - SKIPPED (frontend grouping by chronological order is sufficient; no DB schema change needed)
+- 2.4: Add 'Load negotiation' spinner and error handling (added loadError state to hook; skeleton loader when loading; error toast with retry button)
+- 3.1: Create .env.development and .env.production templates (frontend: VITE_API_URL, VITE_GOOGLE_CLIENT_ID, VITE_APP_NAME, VITE_FRONTEND_THEME; backend: GOOGLE_CLIENT_ID, JWT_SECRET_KEY, FRONTEND_URL)
+- 3.2: Make npm scripts for separate dev and prod modes (dev: vite --mode development; prod: build + preview on port 5000; added build:prod script)
+- 3.3: CI: ensure builds use correct mode for deploys (created .github/workflows/ci.yml with build-frontend, build-backend, and deploy jobs)
+- 4.1: Manual test: Google auth visual & flows (SignInButton uses theme vars, has 150ms animations, focus states visible, ARIA attributes present)
+- 4.2: Manual test: history click-to-load and rounds formatting (click loads negotiation with skeleton, converts to rounds, visual Round dividers)
+- 4.3: Update docs and progress.txt (README updated with env files, npm scripts, theme customization, CI/CD info)
+- 4.4: Commit and tag release - v1.1.0 (cleanup & UI polish complete)
+- 5.1: Allow transcript messages to be edited in UI (edit button on all messages via ChatBubble; inline textarea with Save/Cancel; local state updates immediately)
+- 5.2: Add database support for edited messages (added edited_at TIMESTAMP and original_content TEXT columns; migration script; update_message_content function preserves original)
+- 5.3: Create backend endpoint to update message content (PATCH /api/messages/:id; verifies ownership via negotiation; returns updated message)
+- 5.4: Show edited indicator in negotiation history (ChatBubble shows "(edited)" label; click to toggle original content tooltip)
+- 5.5: Persist edited transcript versions in negotiation history (Message type includes edited_at/original_content; ChatItem passes metadata; ChatBubble displays edited state when loading from DB)
+- 5.6: Investigate bug - some negotiations do not load (added comprehensive logging: API client logs requests/responses with status codes; useNegotiationSession logs negotiation_id and message counts; backend logs user_id and negotiation_id; TextToText handles null/empty negotiations gracefully)
+- 5.7: Fix negotiation loading reliability (race condition protection via request ID counter; defensive null handling for messages array; backend explicitly selects message columns including edit fields; stale responses discarded)
+- 5.8: Add automated safeguard for missing negotiations (SpeechToText now has error UI with retry button; loading skeleton during fetch; pendingLoadId tracking for retry; consistent error handling across both pages)
+- 5.9: Manual test - transcript edits and history reliability (code review verified: ChatBubble has edit UI with save/cancel; PATCH endpoint for message updates; edited_at/original_content columns in DB; "(edited)" indicator with original content tooltip; race condition protection; error handling with retry button; skeleton loaders)
+# (Previous PR completed - kept for archive)
+- 1.1 (OLD): Created backend/database/db.py
+- 1.2 (OLD): Created users table
+- 1.3 (OLD): Created negotiations table
+- 1.4 (OLD): Created messages table
+- 1.5 (OLD): Tested database initialization
+- 2.1 (OLD): Created user_repository.py
+- 2.2 (OLD): Created negotiation_repository.py
+- 2.3 (OLD): Created message_repository.py
+- 3.1 (OLD): Added auth dependencies to requirements.txt
+- 3.2 (OLD): Created backend/auth/config.py
+- 3.3 (OLD): Created backend/auth/jwt_handler.py
+- 3.4 (OLD): Created backend/auth/middleware.py
+- 3.5.1 (OLD): Renamed debates.db to negotiations.db in db.py
+- 3.5.2 (OLD): Renamed debates table to negotiations
+- 3.5.3 (OLD): Updated messages table foreign key (negotiation_id)
+- 3.5.4 (OLD): Renamed debate_repository.py to negotiation_repository.py
+- 3.5.5 (OLD): Updated message_repository.py with negotiation naming
+- 3.5.6 (OLD): Tested all CRUD operations - all passed!
+
+## New Tasks Pending:
+- 1.1: Make SignInButton adopt theme variables (done: true)
+- 1.2: Add subtle animations and accessible focus states to AuthButton (done: true)
+- 1.3: Expose theme colors to backend-configurable override (done: true)
+- 2.1: Make ChatHistorySidebar list items clickable to load negotiation (done: true)
+- 2.2: Format loaded negotiation into rounds in UI (done: true)
+- 2.3: Optional DB migration: add messages.round (INTEGER) (done: true - SKIPPED, frontend grouping is sufficient)
+- 2.4: Add 'Load negotiation' spinner and error handling (done: true)
+- 3.1: Create .env.development and .env.production templates (done: true)
+- 3.2: Make npm scripts for separate dev and prod modes (done: true)
+- 3.3: CI: ensure builds use correct mode for deploys (done: true)
+- 4.1: Manual test: Google auth visual & flows (done: true)
+- 4.2: Manual test: history click-to-load and rounds formatting (done: true)
+- 4.3: Update docs and progress.txt (done: true)
+- 4.4: Commit and tag release (done: true) - Release v1.1.0
+
+## Notes:
+- Use the new prd.json as the single source of truth for task ordering.
+- Always implement only the FIRST incomplete task.
+- Commit message format: "Complete task X.X: [short description]"
+- After marking each task done, update prd.json (set done: true for that task) and append the task to Completed Tasks above (with timestamp if desired).

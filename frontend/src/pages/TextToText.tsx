@@ -10,6 +10,9 @@ import ChatBubble from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
 import DownloadChatButton from "../components/ui/DownloadChatButton";
+import { NegotiationLayout } from "../components/layout/NegotiationLayout";
+import { useNegotiationSession } from "../hooks/useNegotiationSession";
+import { useAuth } from "../context/AuthContext";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -30,9 +33,16 @@ type ChatItem =
       side: "left" | "right";
       /** if present, this message was edited; show this old content above the new one */
       prevContent?: string;
+      /** ISO timestamp when message was edited (from DB) */
+      editedAt?: string | null;
+      /** Original content before edits (from DB) */
+      originalContent?: string | null;
+      /** Message ID for API calls */
+      messageId?: number;
     };
 
-const API_URL = "https://bag-vii-yang-concert.trycloudflare.com/t2t-negotiate";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = `${API_BASE}/t2t-negotiate`;
 
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
@@ -171,6 +181,33 @@ export default function TextToText() {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [lastPromptSent, setLastPromptSent] = useState("");
 
+  // Negotiation session hook for persistence
+  const { isAuthenticated } = useAuth();
+  const {
+    currentNegotiationId,
+    isLoading: isLoadingNegotiation,
+    loadError: negotiationLoadError,
+    startNewNegotiation,
+    loadNegotiation,
+    saveMessage,
+    updateSettings,
+    clearSession,
+    clearError: clearNegotiationError,
+  } = useNegotiationSession();
+
+  // Helper to convert form state to NegotiationSettings
+  const getSettingsFromForm = () => ({
+    model: form.model,
+    topic: form.topic,
+    rules: form.rules,
+    rounds: form.rounds,
+    agent1: { name: form.agent1.name, persona: form.agent1.persona, stance: form.agent1.stance },
+    agent2: { name: form.agent2.name, persona: form.agent2.persona, stance: form.agent2.stance },
+  });
+
+  // Track which negotiation ID we're trying to load (for retry)
+  const [pendingLoadId, setPendingLoadId] = useState<number | null>(null);
+
   useEffect(() => {
     if (!stickToBottom) return;
     const el = chatRef.current;
@@ -250,6 +287,12 @@ export default function TextToText() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
+    // Start a new negotiation in the backend if authenticated
+    let negId: number | null = null;
+    if (isAuthenticated) {
+      negId = await startNewNegotiation(form.topic, 'ai_vs_ai', getSettingsFromForm());
+    }
+
     // Build the system prompt for display
     const currentSystemPrompt = `NEGOTIATION TOPIC: ${form.topic}
 
@@ -268,17 +311,22 @@ export default function TextToText() {
   Rounds: ${form.rounds}`;
 
     setSystemPrompt(currentSystemPrompt);
-    setLastPromptSent("Starting new negotiation (no existing transcript)");  
+    setLastPromptSent("Starting new negotiation (no existing transcript)");
 
     try {
       await postStream(
         API_URL,
         buildPayload({ transcript: "", form }),
-        (msg) => {
+        async (msg) => {
           if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
           if (msg.type === "turn") {
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
+            // Save message to backend using captured negotiation ID
+            if (negId) {
+              const role = side === "left" ? "ai_1" : "ai_2";
+              await saveMessage(role, msg.content, negId);
+            }
           }
         },
         controller.signal
@@ -289,6 +337,144 @@ export default function TextToText() {
       setLoading(false);
       controllerRef.current = null;
     }
+  };
+
+  // Handle selecting a negotiation from sidebar
+  const handleSelectNegotiation = async (id: number) => {
+    console.log(`[handleSelectNegotiation] User clicked negotiation_id=${id}`);
+    setErr(null);
+    setMessages([]);
+    setPaused(false);
+    setLoading(false);
+    setPendingLoadId(id);
+    clearNegotiationError();
+
+    const negotiation = await loadNegotiation(id);
+
+    // Convert loaded messages to ChatItem format with round grouping
+    if (negotiation && negotiation.messages) {
+      console.log(`[handleSelectNegotiation] Converting ${negotiation.messages.length} messages to rounds`);
+      const chatItems = convertMessagesToRounds(negotiation.messages);
+      setMessages(chatItems);
+      setPendingLoadId(null);
+
+      // Restore settings from negotiation if available
+      if (negotiation.settings) {
+        console.log(`[handleSelectNegotiation] Restoring settings from negotiation`);
+        setForm({
+          model: negotiation.settings.model || form.model,
+          topic: negotiation.settings.topic || negotiation.topic,
+          rules: negotiation.settings.rules || form.rules,
+          rounds: negotiation.settings.rounds || form.rounds,
+          agent1: negotiation.settings.agent1 || form.agent1,
+          agent2: negotiation.settings.agent2 || form.agent2,
+        });
+      }
+
+      // Enable Resume if there are messages
+      if (chatItems.length > 0) {
+        setPaused(true);
+      }
+    } else if (negotiation && !negotiation.messages) {
+      // Negotiation loaded but has no messages (empty negotiation)
+      console.log(`[handleSelectNegotiation] Negotiation loaded but empty (no messages)`);
+      setMessages([]);
+      setPendingLoadId(null);
+
+      // Restore settings even for empty negotiations
+      if (negotiation.settings) {
+        setForm({
+          model: negotiation.settings.model || form.model,
+          topic: negotiation.settings.topic || negotiation.topic,
+          rules: negotiation.settings.rules || form.rules,
+          rounds: negotiation.settings.rounds || form.rounds,
+          agent1: negotiation.settings.agent1 || form.agent1,
+          agent2: negotiation.settings.agent2 || form.agent2,
+        });
+      }
+    } else {
+      // negotiation is null - failed to load, error already set by hook
+      console.warn(`[handleSelectNegotiation] Failed to load negotiation_id=${id}`);
+      // Keep pendingLoadId set so retry can work
+    }
+  };
+
+  // Retry loading a negotiation after error
+  const handleRetryLoad = async () => {
+    if (pendingLoadId !== null) {
+      await handleSelectNegotiation(pendingLoadId);
+    }
+  };
+
+  /**
+   * Convert messages to ChatItem format grouped by rounds.
+   * Each round = one exchange between participants:
+   * - For ai_vs_ai: ai_1 message + ai_2 message = 1 round
+   * - For human: user message + AI response = 1 round
+   */
+  const convertMessagesToRounds = (msgs: {
+    id?: number;
+    role: string;
+    content: string;
+    edited_at?: string | null;
+    original_content?: string | null;
+  }[]): ChatItem[] => {
+    if (msgs.length === 0) return [];
+
+    const chatItems: ChatItem[] = [];
+    let currentRound = 0;
+    let lastLeftSpeaker = false; // Track if last message was from left (ai_1/user)
+
+    msgs.forEach((msg, index) => {
+      // Map role to speaker and side
+      let speaker: string;
+      let side: 'left' | 'right';
+
+      if (msg.role === 'ai_1') {
+        speaker = form.agent1.name;
+        side = 'left';
+      } else if (msg.role === 'ai_2') {
+        speaker = form.agent2.name;
+        side = 'right';
+      } else if (msg.role === 'user') {
+        speaker = 'You';
+        side = 'left';
+      } else {
+        speaker = msg.role;
+        side = 'left';
+      }
+
+      // Determine when to start a new round:
+      // - At the start (index 0)
+      // - When left speaker starts after a right speaker message
+      const isLeftSpeaker = side === 'left';
+
+      if (index === 0 || (isLeftSpeaker && !lastLeftSpeaker)) {
+        currentRound++;
+        chatItems.push({ kind: 'round', round: currentRound });
+      }
+
+      lastLeftSpeaker = isLeftSpeaker;
+
+      chatItems.push({
+        kind: 'turn',
+        speaker,
+        content: msg.content,
+        side,
+        messageId: msg.id,
+        editedAt: msg.edited_at,
+        originalContent: msg.original_content,
+      });
+    });
+
+    return chatItems;
+  };
+
+  // Handle new negotiation from sidebar
+  const handleNewNegotiation = () => {
+    clearSession();
+    setMessages([]);
+    setErr(null);
   };
 
   const onPause = () => {
@@ -307,17 +493,28 @@ export default function TextToText() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
+    // Update settings in database if we have a negotiation ID (in case user changed rounds, etc.)
+    const negId = currentNegotiationId;
+    if (isAuthenticated && negId) {
+      await updateSettings(getSettingsFromForm(), negId);
+    }
+
     setLastPromptSent(`Resuming from existing transcript:\n${transcript}`);
-  
+
     try {
       await postStream(
         API_URL,
         buildPayload({ transcript, form }),
-        (msg) => {
+        async (msg) => {
           if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
           if (msg.type === "turn") {
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
+            // Save new messages to database
+            if (negId) {
+              const role = side === "left" ? "ai_1" : "ai_2";
+              await saveMessage(role, msg.content, negId);
+            }
           }
         },
         controller.signal
@@ -378,7 +575,13 @@ export default function TextToText() {
   };
 
   return (
-    <div style={{ width: "90vw", height: "90vh", margin: "5vh auto", color: colors.text, display: "flex", flexDirection: "column" }}>
+    <NegotiationLayout
+      onSelectNegotiation={handleSelectNegotiation}
+      selectedId={currentNegotiationId}
+      onNewNegotiation={handleNewNegotiation}
+      negotiationType="ai_vs_ai"
+    >
+    <div style={{ width: "100%", height: "100%", padding: "20px", color: colors.text, display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Bot–Bot Negotiation</h2>
         <div style={{ display: "flex", gap: 8 }}>
@@ -428,14 +631,46 @@ export default function TextToText() {
         </CardHeader>
 
         <CardContent style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {/* General error display */}
           {err && (
             <div style={{ padding: 12, borderRadius: 8, border: "1px solid #7f1d1d", background: "#1f1111", color: "#fecaca", marginBottom: 12 }}>
               {err}
             </div>
           )}
 
+          {/* Negotiation load error with retry */}
+          {negotiationLoadError && (
+            <div
+              style={{
+                padding: 16,
+                borderRadius: 8,
+                border: "1px solid #7f1d1d",
+                background: "#1f1111",
+                color: "#fecaca",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>{negotiationLoadError}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRetryLoad}
+                style={{
+                  borderColor: "#fecaca",
+                  color: "#fecaca",
+                  marginLeft: 12,
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+
           <div
-          
+
             ref={chatRef}
             onScroll={onScroll}
             style={{
@@ -451,7 +686,60 @@ export default function TextToText() {
               minHeight: 0,
             }}
           >
-            {messages.length === 0 && !loading && (
+            {/* Loading skeleton for negotiation load */}
+            {isLoadingNegotiation && messages.length === 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      background: "rgba(255,255,255,0.05)",
+                      border: `1px solid ${colors.border}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: 12,
+                        width: "30%",
+                        background: "rgba(255,255,255,0.1)",
+                        borderRadius: 4,
+                        marginBottom: 10,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: 14,
+                        width: "85%",
+                        background: "rgba(255,255,255,0.08)",
+                        borderRadius: 4,
+                        marginBottom: 6,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: 14,
+                        width: "70%",
+                        background: "rgba(255,255,255,0.08)",
+                        borderRadius: 4,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                  </div>
+                ))}
+                <style>{`
+                  @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                  }
+                `}</style>
+              </div>
+            )}
+
+            {messages.length === 0 && !loading && !isLoadingNegotiation && (
               <div style={{ color: colors.muted, fontSize: 14 }}>Transcript will appear here.</div>
             )}
 
@@ -495,6 +783,8 @@ export default function TextToText() {
                       setDraft("");
                     }}
                     onSave={onSaveEdit}
+                    editedAt={m.editedAt}
+                    originalContent={m.originalContent}
                   />
                 </div>
               )
@@ -514,24 +804,10 @@ export default function TextToText() {
     <>
       <Button variant="outline" onClick={() => setOpenSettings(false)}>Cancel</Button>
       <Button
-        onClick={async () => {
+        onClick={() => {
           setOpenSettings(false);
-          try {
-            const res = await fetch(API_URL + "/update-settings", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(form),
-            });
-
-            if (!res.ok) {
-              throw new Error(`Failed to update backend settings (status ${res.status})`);
-            }
-
-            console.log("Settings saved to backend:", form);
-          } catch (err) {
-            console.error("Saved settings successfully:", err);
-            alert("Settings saved successfully.");
-          }
+          // Settings are stored in local state (form) and passed directly
+          // to the API via buildPayload when starting a negotiation
         }}
       >
         Save
@@ -800,5 +1076,6 @@ Rounds: ${form.rounds}`;
   )}
 </>
 </div>
+    </NegotiationLayout>
   );
 }

@@ -10,6 +10,9 @@ import ChatBubble from "../components/ChatBubble";
 import Modal from "../components/Modal";
 import { colors } from "../components/ui/colors";
 import DownloadChatButton from "../components/ui/DownloadChatButton";
+import { NegotiationLayout } from "../components/layout/NegotiationLayout";
+import { useNegotiationSession } from "../hooks/useNegotiationSession";
+import { useAuth } from "../context/AuthContext";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -111,9 +114,57 @@ export default function SpeechToText() {
   const maxTimeoutRef = useRef<number | null>(null);
   const [sendingToBot, setSendingToBot] = useState(false);
 
-  const TRANSCRIBE_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/transcribe";
-  const RESPOND_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/respond";
-  const SETTINGS_URL = "https://bag-vii-yang-concert.trycloudflare.com/speech-to-text/update-settings";
+  // Negotiation session hook for persistence
+  const { isAuthenticated } = useAuth();
+  const {
+    currentNegotiationId,
+    isLoading: isLoadingNegotiation,
+    loadError: negotiationLoadError,
+    startNewNegotiation,
+    loadNegotiation,
+    saveMessage,
+    clearSession,
+    clearError: clearNegotiationError,
+  } = useNegotiationSession();
+
+  // Track pending load ID for retry
+  const [pendingLoadId, setPendingLoadId] = useState<number | null>(null);
+
+  // Handle selecting a negotiation from sidebar
+  const handleSelectNegotiation = async (id: number) => {
+    setPendingLoadId(id);
+    clearNegotiationError();
+    const negotiation = await loadNegotiation(id);
+    if (negotiation) {
+      // Convert loaded messages to local chat format
+      const loadedMessages: ChatItem[] = (negotiation.messages || []).map((m) => ({
+        speaker: m.role === 'user' ? 'You' : form.agent2.name,
+        content: m.content,
+        side: m.role === 'user' ? 'left' as const : 'right' as const,
+      }));
+      setMessages(loadedMessages);
+      setPendingLoadId(null);
+    }
+  };
+
+  // Retry loading a negotiation after error
+  const handleRetryLoad = async () => {
+    if (pendingLoadId !== null) {
+      await handleSelectNegotiation(pendingLoadId);
+    }
+  };
+
+  // Handle new negotiation from sidebar
+  const handleNewNegotiation = () => {
+    clearSession();
+    setMessages([]);
+    setError(null);
+  };
+
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const TRANSCRIBE_URL = `${API_BASE}/speech-to-text/transcribe`;
+  const RESPOND_URL = `${API_BASE}/speech-to-text/respond`;
+  const SETTINGS_URL = `${API_BASE}/speech-to-text/update-settings`;
 
 
   // Auto-scroll chat
@@ -440,6 +491,19 @@ export default function SpeechToText() {
         { speaker: form.agent2.name, content: data.bot, side: "right" },
       ]);
 
+      // Save messages to backend if authenticated
+      if (isAuthenticated) {
+        // Start a new negotiation if we don't have one
+        let negId = currentNegotiationId;
+        if (!negId) {
+          negId = await startNewNegotiation(form.topic, 'user_vs_ai');
+        }
+        if (negId) {
+          await saveMessage('user', data.you, negId);
+          await saveMessage('ai_1', data.bot, negId);
+        }
+      }
+
       // Clear the edit box
       setTranscript("");
       setHasTranscript(false);
@@ -460,13 +524,18 @@ export default function SpeechToText() {
 
 
   return (
-    <>
+    <NegotiationLayout
+      onSelectNegotiation={handleSelectNegotiation}
+      selectedId={currentNegotiationId}
+      onNewNegotiation={handleNewNegotiation}
+      negotiationType="user_vs_ai"
+    >
       <style>{spinnerKeyframes}</style>
       <div
         style={{
-          width: "90vw",
-          height: "90vh",
-          margin: "5vh auto",
+          width: "100%",
+          height: "100%",
+          padding: "20px",
           display: "flex",
           flexDirection: "column",
           color: colors.text,
@@ -569,7 +638,91 @@ export default function SpeechToText() {
               </div>
             )}
 
-            {messages.length === 0 && !recording && !hasTranscript && (
+            {/* Negotiation load error with retry */}
+            {negotiationLoadError && (
+              <div
+                style={{
+                  padding: 16,
+                  borderRadius: 8,
+                  border: "1px solid #7f1d1d",
+                  background: "#1f1111",
+                  color: "#fecaca",
+                  marginBottom: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span>{negotiationLoadError}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRetryLoad}
+                  style={{
+                    borderColor: "#fecaca",
+                    color: "#fecaca",
+                    marginLeft: 12,
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+
+            {/* Loading skeleton for negotiation load */}
+            {isLoadingNegotiation && messages.length === 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      background: "rgba(255,255,255,0.05)",
+                      border: `1px solid ${colors.border}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: 12,
+                        width: "30%",
+                        background: "rgba(255,255,255,0.1)",
+                        borderRadius: 4,
+                        marginBottom: 10,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: 14,
+                        width: "85%",
+                        background: "rgba(255,255,255,0.08)",
+                        borderRadius: 4,
+                        marginBottom: 6,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: 14,
+                        width: "70%",
+                        background: "rgba(255,255,255,0.08)",
+                        borderRadius: 4,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                  </div>
+                ))}
+                <style>{`
+                  @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                  }
+                `}</style>
+              </div>
+            )}
+
+            {messages.length === 0 && !recording && !hasTranscript && !isLoadingNegotiation && (
               <div style={{ color: colors.muted, fontSize: 14 }}>
                 Press 🎤 to record your voice.
               </div>
@@ -620,6 +773,8 @@ export default function SpeechToText() {
                     setDraft("");
                   }}
                   onSave={onSaveEdit}
+                  editedAt={undefined}
+                  originalContent={undefined}
                 />
               </div>
             ))}
@@ -985,6 +1140,6 @@ export default function SpeechToText() {
           )}
         </>
       </div>
-    </>  
+    </NegotiationLayout>
   );
 }

@@ -9,6 +9,15 @@
     --ring: rgba(204,0,0,.35);
     --radius: 12px;
     --shadow: 0 8px 25px rgba(0,0,0,.2);
+
+    /* Theme variables for components */
+    --color-primary: var(--wolfpack);
+    --color-accent: var(--wolfpack);
+    --color-muted: var(--muted);
+
+    /* Auth button theming */
+    --auth-bg: var(--color-accent);
+    --auth-fg: #fff;
   }
   
   * {
