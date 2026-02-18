@@ -96,8 +96,11 @@ export function useNegotiationSession() {
   );
 
   const saveMessage = useCallback(
-    async (role: string, content: string) => {
-      if (!isAuthenticated || !currentNegotiationId) {
+    async (role: string, content: string, negotiationIdOverride?: number) => {
+      // Use override if provided (for when state hasn't updated yet)
+      const negId = negotiationIdOverride ?? currentNegotiationId;
+
+      if (!isAuthenticated || !negId) {
         // Still add to local messages even if not authenticated
         const localMessage: Message = {
           id: Date.now(),
@@ -111,7 +114,7 @@ export function useNegotiationSession() {
       }
 
       try {
-        const message = await addMessage(currentNegotiationId, role, content);
+        const message = await addMessage(negId, role, content);
         setMessages((prev) => [...prev, message]);
         return message;
       } catch (error) {
@@ -119,7 +122,7 @@ export function useNegotiationSession() {
         // Still add to local state even if API fails
         const localMessage: Message = {
           id: Date.now(),
-          negotiation_id: currentNegotiationId,
+          negotiation_id: negId,
           role,
           content,
           created_at: new Date().toISOString(),

@@ -494,11 +494,14 @@ export default function SpeechToText() {
       // Save messages to backend if authenticated
       if (isAuthenticated) {
         // Start a new negotiation if we don't have one
-        if (!currentNegotiationId) {
-          await startNewNegotiation(form.topic, 'user_vs_ai');
+        let negId = currentNegotiationId;
+        if (!negId) {
+          negId = await startNewNegotiation(form.topic, 'user_vs_ai');
         }
-        await saveMessage('user', data.you);
-        await saveMessage('ai_1', data.bot);
+        if (negId) {
+          await saveMessage('user', data.you, negId);
+          await saveMessage('ai_1', data.bot, negId);
+        }
       }
 
       // Clear the edit box
