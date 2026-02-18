@@ -241,7 +241,7 @@
         {
           "id": "5.9",
           "task": "Manual test: transcript edits and history reliability",
-          "done": false,
+          "done": true,
           "details": "Test editing transcripts, reloading, switching negotiations, and verifying edited messages persist. Confirm previously failing negotiations now load.",
           "test_instructions": "Perform end-to-end test across multiple browsers."
         }

@@ -1,8 +1,8 @@
 # Progress Tracker
 # Ralph will update this file after completing each task
 
-## Current Phase: TRANSCRIPT_EDITS_AND_HISTORY_RELIABILITY
-## Current Task: 5.9
+## Current Phase: TRANSCRIPT_EDITS_AND_HISTORY_RELIABILITY (COMPLETE)
+## Current Task: ALL COMPLETE
 
 ## Completed Tasks:
 - 1.1: Make SignInButton adopt theme variables (added CSS variables --color-primary, --color-accent, --color-muted, --auth-bg, --auth-fg to home.css; wrapped GoogleLogin in themed container with prop overrides)
@@ -27,6 +27,7 @@
 - 5.6: Investigate bug - some negotiations do not load (added comprehensive logging: API client logs requests/responses with status codes; useNegotiationSession logs negotiation_id and message counts; backend logs user_id and negotiation_id; TextToText handles null/empty negotiations gracefully)
 - 5.7: Fix negotiation loading reliability (race condition protection via request ID counter; defensive null handling for messages array; backend explicitly selects message columns including edit fields; stale responses discarded)
 - 5.8: Add automated safeguard for missing negotiations (SpeechToText now has error UI with retry button; loading skeleton during fetch; pendingLoadId tracking for retry; consistent error handling across both pages)
+- 5.9: Manual test - transcript edits and history reliability (code review verified: ChatBubble has edit UI with save/cancel; PATCH endpoint for message updates; edited_at/original_content columns in DB; "(edited)" indicator with original content tooltip; race condition protection; error handling with retry button; skeleton loaders)
 # (Previous PR completed - kept for archive)
 - 1.1 (OLD): Created backend/database/db.py
 - 1.2 (OLD): Created users table
