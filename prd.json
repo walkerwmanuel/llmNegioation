@@ -234,7 +234,7 @@
         {
           "id": "5.8",
           "task": "Add automated safeguard for missing negotiations",
-          "done": false,
+          "done": true,
           "details": "If negotiation fails to load, show user-friendly message and retry button. Prevent UI freeze. Log error for debugging.",
           "test_instructions": "Simulate API failure and verify retry UI appears."
         },

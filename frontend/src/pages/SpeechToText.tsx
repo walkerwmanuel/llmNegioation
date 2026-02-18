@@ -118,15 +118,40 @@ export default function SpeechToText() {
   const { isAuthenticated } = useAuth();
   const {
     currentNegotiationId,
+    isLoading: isLoadingNegotiation,
+    loadError: negotiationLoadError,
     startNewNegotiation,
     loadNegotiation,
     saveMessage,
     clearSession,
+    clearError: clearNegotiationError,
   } = useNegotiationSession();
+
+  // Track pending load ID for retry
+  const [pendingLoadId, setPendingLoadId] = useState<number | null>(null);
 
   // Handle selecting a negotiation from sidebar
   const handleSelectNegotiation = async (id: number) => {
-    await loadNegotiation(id);
+    setPendingLoadId(id);
+    clearNegotiationError();
+    const negotiation = await loadNegotiation(id);
+    if (negotiation) {
+      // Convert loaded messages to local chat format
+      const loadedMessages: ChatItem[] = (negotiation.messages || []).map((m) => ({
+        speaker: m.role === 'user' ? 'You' : form.agent2.name,
+        content: m.content,
+        side: m.role === 'user' ? 'left' as const : 'right' as const,
+      }));
+      setMessages(loadedMessages);
+      setPendingLoadId(null);
+    }
+  };
+
+  // Retry loading a negotiation after error
+  const handleRetryLoad = async () => {
+    if (pendingLoadId !== null) {
+      await handleSelectNegotiation(pendingLoadId);
+    }
   };
 
   // Handle new negotiation from sidebar
@@ -609,7 +634,91 @@ export default function SpeechToText() {
               </div>
             )}
 
-            {messages.length === 0 && !recording && !hasTranscript && (
+            {/* Negotiation load error with retry */}
+            {negotiationLoadError && (
+              <div
+                style={{
+                  padding: 16,
+                  borderRadius: 8,
+                  border: "1px solid #7f1d1d",
+                  background: "#1f1111",
+                  color: "#fecaca",
+                  marginBottom: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span>{negotiationLoadError}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRetryLoad}
+                  style={{
+                    borderColor: "#fecaca",
+                    color: "#fecaca",
+                    marginLeft: 12,
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+
+            {/* Loading skeleton for negotiation load */}
+            {isLoadingNegotiation && messages.length === 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      background: "rgba(255,255,255,0.05)",
+                      border: `1px solid ${colors.border}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: 12,
+                        width: "30%",
+                        background: "rgba(255,255,255,0.1)",
+                        borderRadius: 4,
+                        marginBottom: 10,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: 14,
+                        width: "85%",
+                        background: "rgba(255,255,255,0.08)",
+                        borderRadius: 4,
+                        marginBottom: 6,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                    <div
+                      style={{
+                        height: 14,
+                        width: "70%",
+                        background: "rgba(255,255,255,0.08)",
+                        borderRadius: 4,
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                  </div>
+                ))}
+                <style>{`
+                  @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                  }
+                `}</style>
+              </div>
+            )}
+
+            {messages.length === 0 && !recording && !hasTranscript && !isLoadingNegotiation && (
               <div style={{ color: colors.muted, fontSize: 14 }}>
                 Press 🎤 to record your voice.
               </div>
