@@ -10,3 +10,4 @@ python-multipart
 python-jose[cryptography]
 google-auth
 google-auth-oauthlib
+google-genai
