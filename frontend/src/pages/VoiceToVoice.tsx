@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { diffWords } from "diff";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -15,13 +15,12 @@ import { useNegotiationSession } from "../hooks/useNegotiationSession";
 import { useAuth } from "../context/AuthContext";
 
 type Agent = { name: string; persona: string; stance: string };
+
 type FormState = {
   model: string;
   topic: string;
   rules: string;
-  rounds: number;
-  agent1: Agent;
-  agent2: Agent;
+  agent2: Agent; // BOT
 };
 
 type ChatItem = {
@@ -33,30 +32,43 @@ type ChatItem = {
 
 const spinnerKeyframes = `
   @keyframes spin {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 `;
 
+function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
+  const parts = React.useMemo(() => diffWords(oldText ?? "", newText ?? ""), [oldText, newText]);
+  return (
+    <span style={{ whiteSpace: "pre-wrap" }}>
+      {parts.map((p, i) => {
+        if (p.removed) {
+          return (
+            <span key={i} style={{ textDecoration: "line-through", opacity: 0.7 }}>
+              {p.value}
+            </span>
+          );
+        }
+        if (p.added) {
+          return (
+            <span key={i} style={{ background: "rgba(16,185,129,.15)" }}>
+              {p.value}
+            </span>
+          );
+        }
+        return <span key={i}>{p.value}</span>;
+      })}
+    </span>
+  );
+}
 
-export default function SpeechToText() {
+export default function VoiceToVoice() {
   const defaults: FormState = useMemo(
     () => ({
       model: "gpt-4o-mini",
       topic: "Negotiation over the price of Emily's used car.",
       rules:
         "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn after your introduction.\n2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.",
-      rounds: 4,
-      agent1: {
-        name: "You",
-        persona:
-          "You are a cautious buyer with a limited budget who has researched similar cars and believes a fair price is closer to $12,000. You value fairness and want to push back against inflated prices while still being open to compromise.",
-        stance: "Negotiate to bring the price down to a fair market value, using your research as justification.",
-      },
       agent2: {
         name: "Emily",
         persona:
@@ -68,45 +80,33 @@ export default function SpeechToText() {
     []
   );
 
-  function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
-    const parts = React.useMemo(() => diffWords(oldText ?? "", newText ?? ""), [oldText, newText]);
-    return (
-      <span style={{ whiteSpace: "pre-wrap" }}>
-        {parts.map((p, i) => {
-          if (p.removed) {
-            return (
-              <span key={i} style={{ textDecoration: "line-through", opacity: 0.7 }}>
-                {p.value}
-              </span>
-            );
-          }
-          if (p.added) {
-            // optional: highlight additions
-            return <span key={i} style={{ background: "rgba(16,185,129,.15)" }}>{p.value}</span>;
-          }
-          return <span key={i}>{p.value}</span>;
-        })}
-      </span>
-    );
-  }
-
   const [form, setForm] = useState<FormState>(defaults);
   const [openSettings, setOpenSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const MAX_RECORDING_TIME = 30; // Max of 30 seconds recording
+  const MAX_RECORDING_TIME = 30;
+
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [err, setError] = useState<string | null>(null);
+
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+
   const [stickToBottom, setStickToBottom] = useState(true);
   const [transcript, setTranscript] = useState("");
   const [hasTranscript, setHasTranscript] = useState(false);
+
+  // Prompt inspector panel
   const [showPromptPanel, setShowPromptPanel] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState("");
   const [lastPromptSent, setLastPromptSent] = useState("");
-  
+
+  // Voice playback (TTS) for bot response
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [speaking, setSpeaking] = useState(false);
+
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chatRef = useRef<HTMLDivElement | null>(null);
@@ -114,10 +114,11 @@ export default function SpeechToText() {
   const maxTimeoutRef = useRef<number | null>(null);
   const [sendingToBot, setSendingToBot] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
-  const TRANSCRIBE_URL = `${API_BASE}/speech-to-text/transcribe`;
-  const RESPOND_URL = `${API_BASE}/speech-to-text/respond`;
-  const SETTINGS_URL = `${API_BASE}/speech-to-text/update-settings`;
+  // Keep latest form for callbacks without dependency churn
+  const formRef = useRef<FormState>(form);
+  useEffect(() => {
+    formRef.current = form;
+  }, [form]);
 
   // Negotiation session hook for persistence
   const { isAuthenticated } = useAuth();
@@ -135,35 +136,98 @@ export default function SpeechToText() {
   // Track pending load ID for retry
   const [pendingLoadId, setPendingLoadId] = useState<number | null>(null);
 
+  // API endpoints
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const TRANSCRIBE_URL = `${API_BASE}/speech-to-text/transcribe`;
+  const RESPOND_URL = `${API_BASE}/speech-to-text/respond`;
+  const SETTINGS_URL = `${API_BASE}/speech-to-text/update-settings`;
+
+  const speakText = (text: string) => {
+    try {
+      if (!ttsEnabled) return;
+      if (!("speechSynthesis" in window)) return;
+
+      window.speechSynthesis.cancel();
+
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 1.0;
+      utter.pitch = 1.0;
+      utter.onstart = () => setSpeaking(true);
+      utter.onend = () => setSpeaking(false);
+      utter.onerror = () => setSpeaking(false);
+
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // ignore
+    }
+  };
+
+  const stopSpeaking = () => {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // ignore
+    } finally {
+      setSpeaking(false);
+    }
+  };
+
+  const postSettings = async () => {
+    const f = formRef.current;
+    const payload = {
+      model: f.model,
+      topic: f.topic,
+      rules: f.rules,
+      bot: {
+        name: f.agent2.name,
+        personality: f.agent2.persona,
+        goal: f.agent2.stance,
+      },
+    };
+
+    const res = await fetch(SETTINGS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`Failed to update settings (status ${res.status}): ${t}`);
+    }
+  };
+
   // Handle selecting a negotiation from sidebar
   const handleSelectNegotiation = async (id: number) => {
     setPendingLoadId(id);
     clearNegotiationError();
+
     const negotiation = await loadNegotiation(id);
     if (negotiation) {
-      // Convert loaded messages to local chat format
+      const botName = formRef.current.agent2.name;
+
       const loadedMessages: ChatItem[] = (negotiation.messages || []).map((m) => ({
-        speaker: m.role === 'user' ? 'You' : form.agent2.name,
+        speaker: m.role === "user" ? "You" : botName,
         content: m.content,
-        side: m.role === 'user' ? 'left' as const : 'right' as const,
+        side: m.role === "user" ? ("left" as const) : ("right" as const),
       }));
+
       setMessages(loadedMessages);
       setPendingLoadId(null);
     }
   };
 
-  // Retry loading a negotiation after error
   const handleRetryLoad = async () => {
-    if (pendingLoadId !== null) {
-      await handleSelectNegotiation(pendingLoadId);
-    }
+    if (pendingLoadId !== null) await handleSelectNegotiation(pendingLoadId);
   };
 
-  // Handle new negotiation from sidebar
   const handleNewNegotiation = () => {
     clearSession();
     setMessages([]);
     setError(null);
+    setTranscript("");
+    setHasTranscript(false);
+    stopSpeaking();
   };
 
   // Auto-scroll chat
@@ -176,57 +240,42 @@ export default function SpeechToText() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+      try {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+        }
+      } catch {
+        // ignore
       }
+      stopSpeaking();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Initialize settings on mount
   useEffect(() => {
-  // Send initial settings to backend on component mount
-  const initializeSettings = async () => {
-    try {
-      const payload = {
-        model: form.model,
-        topic: form.topic,
-        rules: form.rules,
-        bot: {
-          name: form.agent2.name,
-          personality: form.agent2.persona,
-          goal: form.agent2.stance,
-        },
-      };
-
-      const res = await fetch(SETTINGS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to initialize settings (status ${res.status})`);
+    const initializeSettings = async () => {
+      try {
+        await postSettings();
+      } catch (e: any) {
+        setError(e.message || "Failed to initialize settings");
       }
+    };
+    initializeSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      console.log("Settings initialized successfully:", payload);
-    } catch (err) {
-      console.error("Error initializing settings:", err);
-      setError("Failed to initialize settings");
-    }
-  };
-
-  initializeSettings();
-}, []);
-
-
-    // Keyboard shortcuts
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+
+      // If typing in an input/textarea, only handle modal/edit save/cancel
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) {
         if (openSettings || editingIndex !== null) {
-          if ((event.ctrlKey || event.metaKey) &&event.code === "Enter") {
+          if ((event.ctrlKey || event.metaKey) && event.code === "Enter") {
             event.preventDefault();
-            if (editingIndex !== null) onSaveEdit();
+            if (editingIndex !== null) void onSaveEdit();
             else if (openSettings) setOpenSettings(false);
           } else if (event.code === "Escape") {
             event.preventDefault();
@@ -235,26 +284,34 @@ export default function SpeechToText() {
               setDraft("");
             } else if (openSettings) setOpenSettings(false);
           }
-        }     
+        }
         return;
       }
+
+      // Ctrl/Cmd+Enter send transcript
       if ((event.ctrlKey || event.metaKey) && event.code === "Enter" && hasTranscript && transcript.trim() && !sendingToBot) {
         event.preventDefault();
-        sendTranscriptToBot();
-      }     
-      // Space = record
+        void sendTranscriptToBot();
+        return;
+      }
+
+      // Space: start/stop recording
       if (event.code === "Space") {
         event.preventDefault();
-        if (!recording) startRecording();
+        if (!recording) void startRecording();
         else stopRecording();
+        return;
       }
-      // 's' = open settings
-      else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+
+      // Ctrl/Cmd+S: settings
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         setOpenSettings(true);
+        return;
       }
-      // 'e' = edit last response
-      else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "e") {
+
+      // Ctrl/Cmd+E: edit last message
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "e") {
         event.preventDefault();
         const lastIndex = messages.length - 1;
         if (lastIndex >= 0) {
@@ -264,11 +321,12 @@ export default function SpeechToText() {
         }
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [messages, recording, openSettings, editingIndex, hasTranscript, sendingToBot]);
+  }, [messages, recording, openSettings, editingIndex, hasTranscript, transcript, sendingToBot]);
 
-  async function startRecording() {   // Start recording audio
+  async function startRecording() {
     setError(null);
     setRecording(true);
     setRecordingTime(0);
@@ -276,52 +334,30 @@ export default function SpeechToText() {
     const chunks: BlobPart[] = [];
 
     try {
-      // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      
-      // Try to use audio/webm if supported, otherwise fallback to audio/ogg
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
-        ? 'audio/webm' 
-        : 'audio/ogg';
-      
+
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
 
-      console.log("Using MIME type:", mimeType);
-
-      // Collect audio chunks
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
-          console.log("Chunk received:", e.data.size, "bytes");
-        }
+        if (e.data.size > 0) chunks.push(e.data);
       };
 
-      // When recording stops
       mediaRecorder.onstop = async () => {
-        console.log("Recording stopped, processing...");
-        
-        // Clear timers
-        if (timerRef.current) clearInterval(timerRef.current);
-        if (maxTimeoutRef.current) clearTimeout(maxTimeoutRef.current);
+        if (timerRef.current) window.clearInterval(timerRef.current);
+        if (maxTimeoutRef.current) window.clearTimeout(maxTimeoutRef.current);
 
         try {
           const blob = new Blob(chunks, { type: mimeType });
-          console.log("Total blob size:", blob.size, "bytes");
-          
-          if (blob.size === 0) {
-            throw new Error("Recording failed: no audio data captured");
-          }
+          if (blob.size === 0) throw new Error("Recording failed: no audio data captured");
 
-          // Use the appropriate file extension
-          const extension = mimeType.includes('webm') ? 'webm' : 'ogg';
+          const extension = mimeType.includes("webm") ? "webm" : "ogg";
           const file = new File([blob], `speech.${extension}`, { type: mimeType });
 
           const formData = new FormData();
           formData.append("file", file);
-
-          console.log("Sending audio to transcription API...");
 
           const res = await fetch(TRANSCRIBE_URL, { method: "POST", body: formData });
 
@@ -331,62 +367,53 @@ export default function SpeechToText() {
           }
 
           const data = await res.json();
-          console.log("Transcription response:", data);
+          if (!data.transcript) throw new Error("No transcript returned from server");
 
-          if (!data.transcript) {
-            throw new Error("No transcript returned from server");
-          }
-
-          // Save transcript so user can edit it
           setTranscript(data.transcript);
           setHasTranscript(true);
-
-        } catch (err: any) {
-          console.error("Error processing recording:", err);
-          setError(err.message);
+        } catch (e: any) {
+          setError(e.message || "Failed to transcribe audio");
         } finally {
-          // Clean up stream
-          if (streamRef.current) {
-            streamRef.current.getTracks().forEach((track) => track.stop());
-            streamRef.current = null;
+          try {
+            if (streamRef.current) {
+              streamRef.current.getTracks().forEach((track) => track.stop());
+              streamRef.current = null;
+            }
+          } catch {
+            // ignore
           }
           setRecording(false);
           setRecordingTime(0);
         }
       };
 
-      // Start recording
       mediaRecorder.start();
-      console.log("Recording started...");
 
-      // Update recording time every second
-      timerRef.current = window.setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
+      timerRef.current = window.setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
 
       maxTimeoutRef.current = window.setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-          console.log("Max recording time reached, stopping...");
           stopRecording();
         }
       }, MAX_RECORDING_TIME * 1000);
-    } catch (err: any) {
-      console.error("Error starting recording:", err);
-      setError(err.message);
+    } catch (e: any) {
+      setError(e.message || "Failed to start recording");
       setRecording(false);
       setRecordingTime(0);
-      
-      // Ensure microphone tracks are stopped if error occurs
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
+
+      try {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+      } catch {
+        // ignore
       }
     }
   }
 
   function stopRecording() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      console.log("Stopping recording...");
       mediaRecorderRef.current.stop();
     }
   }
@@ -400,17 +427,16 @@ export default function SpeechToText() {
       const updated = [...messages];
       const item = updated[editingIndex];
 
-      // Preserve the old content to display with strikethrough
       const old = item.content;
       updated[editingIndex] = { ...item, prevContent: old, content: draft };
 
-      // Remove messages after edited message
       const prefix = updated.slice(0, editingIndex + 1);
-
       setMessages(prefix);
-      setEditingIndex(null)
+
+      setEditingIndex(null);
       setDraft("");
 
+      // Only re-call bot if user edited their own message
       if (item.speaker === "You") {
         const res = await fetch(RESPOND_URL, {
           method: "POST",
@@ -424,46 +450,47 @@ export default function SpeechToText() {
         }
 
         const data = await res.json();
-        console.log("Respond response:", data);
+        if (data?.error) throw new Error(data.error);
+        if (!data?.bot) throw new Error("Unexpected response from server");
 
         setMessages((prev) => [
           ...prev,
-          { speaker: form.agent2.name, content: data.bot, side: "right" },
+          { speaker: formRef.current.agent2.name, content: String(data.bot), side: "right" },
         ]);
+
+        speakText(String(data.bot));
       }
-    } catch (err: any) {
-      console.error("Error saving edit:", err);
-      setError(err.message || "Failed to save edit and get response");
+    } catch (e: any) {
+      setError(e.message || "Failed to save edit and get response");
     }
   };
 
   async function sendTranscriptToBot() {
     if (sendingToBot) return;
+
     try {
       setError(null);
       setSendingToBot(true);
 
       const cleaned = transcript.trim();
-      if (!cleaned) {
-        throw new Error("Transcript is empty. Please type something before sending.");
-      }
+      if (!cleaned) throw new Error("Transcript is empty. Please type something before sending.");
 
-      const currentSystemPrompt = `You are ${form.agent2.name}.
+      const f = formRef.current;
 
-  ${form.agent2.persona}
+      const currentSystemPrompt = `You are ${f.agent2.name}.
 
-  Your goal: ${form.agent2.stance}
+${f.agent2.persona}
 
-  Topic of conversation: ${form.topic}
+Your goal: ${f.agent2.stance}
 
-  ${form.rules}
+Topic of conversation: ${f.topic}
 
-  Respond to the users message following these guidelines.`;
+${f.rules}
 
-      // Store it so we can display it in the panel
+Respond to the users message following these guidelines.`;
+
       setSystemPrompt(currentSystemPrompt);
-      setLastPromptSent(`User message: ${cleaned}`);      
-
+      setLastPromptSent(`User message: ${cleaned}`);
 
       const res = await fetch(RESPOND_URL, {
         method: "POST",
@@ -477,59 +504,57 @@ export default function SpeechToText() {
       }
 
       const data = await res.json();
-      console.log("Respond response:", data);
-
-      if (!data.you || !data.bot) {
-        throw new Error("Unexpected response from server");
-      }
+      if (data?.error) throw new Error(data.error);
+      if (!data?.you || !data?.bot) throw new Error("Unexpected response from server");
 
       // Add to chat history
       setMessages((prev) => [
         ...prev,
-        { speaker: "You", content: data.you, side: "left" },
-        { speaker: form.agent2.name, content: data.bot, side: "right" },
+        { speaker: "You", content: String(data.you), side: "left" },
+        { speaker: f.agent2.name, content: String(data.bot), side: "right" },
       ]);
 
-      // Save messages to backend if authenticated
+      // Speak bot response (voice-to-voice behavior)
+      speakText(String(data.bot));
+
+      // Save messages if authenticated
       if (isAuthenticated) {
-        // Start a new negotiation if we don't have one
         let negId = currentNegotiationId;
+
         if (!negId) {
-          negId = await startNewNegotiation(form.topic, 'user_vs_ai');
+          // keep your backend type naming consistent — if you use 'voice_to_voice' in DB, use it here
+          negId = await startNewNegotiation(f.topic, "voice_to_voice");
         }
+
         if (negId) {
-          await saveMessage('user', data.you, negId);
-          await saveMessage('ai_1', data.bot, negId);
+          await saveMessage("user", String(data.you), negId);
+          await saveMessage("ai_1", String(data.bot), negId);
         }
       }
 
-      // Clear the edit box
       setTranscript("");
       setHasTranscript(false);
-    } catch (err: any) {
-      console.error("Error sending transcript:", err);
-      setError(err.message || "Failed to send transcript to bot");
+    } catch (e: any) {
+      setError(e.message || "Failed to send transcript to bot");
     } finally {
       setSendingToBot(false);
     }
   }
 
   const chatTranscript = useMemo(() => {
-  if (messages.length === 0) return "";
-  return messages
-    .map((m) => `${m.speaker}: ${m.content}`)
-    .join("\n\n");
-}, [messages]);
-
+    if (messages.length === 0) return "";
+    return messages.map((m) => `${m.speaker}: ${m.content}`).join("\n\n");
+  }, [messages]);
 
   return (
     <NegotiationLayout
       onSelectNegotiation={handleSelectNegotiation}
       selectedId={currentNegotiationId}
       onNewNegotiation={handleNewNegotiation}
-      negotiationType="user_vs_ai"
+      negotiationType="voice_to_voice"
     >
       <style>{spinnerKeyframes}</style>
+
       <div
         style={{
           width: "100%",
@@ -540,16 +565,10 @@ export default function SpeechToText() {
           color: colors.text,
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Human-Bot Negotiation</h2>
-          <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Voice ↔ Voice Negotiation</h2>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <Button
               variant="ghost"
               size="sm"
@@ -560,9 +579,25 @@ export default function SpeechToText() {
             >
               ⚙ Settings
             </Button>
+
             <Button variant="ghost" size="sm" onClick={() => setShowShortcuts((v) => !v)}>
               ? Keyboard Shortcuts
             </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTtsEnabled((v) => !v)}
+              title="Toggle bot voice playback"
+            >
+              {ttsEnabled ? "AI Voice: ON" : "AI Voice: OFF"}
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={stopSpeaking} disabled={!speaking}>
+              Stop Voice
+            </Button>
+
+            <DownloadChatButton transcript={chatTranscript} />
           </div>
         </div>
 
@@ -589,7 +624,7 @@ export default function SpeechToText() {
             </span>
             <span>
               <b>Control / Command + Enter / Return</b> = Send Audio Transcript to Bot
-            </span>          
+            </span>
             <span>
               <b>Control / Command + S</b> = Open Settings
             </span>
@@ -601,26 +636,35 @@ export default function SpeechToText() {
 
         <Card style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <CardHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <CardTitle>Negotiation</CardTitle>
+            <CardTitle>Conversation</CardTitle>
+
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {recording && (
                 <span style={{ fontSize: 14, color: colors.muted }}>
                   {recordingTime}s / {MAX_RECORDING_TIME}s
                 </span>
               )}
+
               {!recording ? (
-                <Button onClick={startRecording}>🎤 Start Recording</Button>
+                <Button onClick={startRecording} disabled={sendingToBot || isLoadingNegotiation}>
+                  🎤 Start Recording
+                </Button>
               ) : (
                 <Button onClick={stopRecording} variant="outline">
-                  ⏹ Stop ({MAX_RECORDING_TIME - recordingTime}s)
+                  ⏹ Stop ({Math.max(0, MAX_RECORDING_TIME - recordingTime)}s)
                 </Button>
               )}
-            <DownloadChatButton transcript={chatTranscript} />
-
             </div>
           </CardHeader>
+
           <CardContent
-            style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
+            ref={chatRef}
+            style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto" }}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+              setStickToBottom(nearBottom);
+            }}
           >
             {err && (
               <div
@@ -657,18 +701,14 @@ export default function SpeechToText() {
                   variant="outline"
                   size="sm"
                   onClick={handleRetryLoad}
-                  style={{
-                    borderColor: "#fecaca",
-                    color: "#fecaca",
-                    marginLeft: 12,
-                  }}
+                  style={{ borderColor: "#fecaca", color: "#fecaca", marginLeft: 12 }}
                 >
                   Retry
                 </Button>
               </div>
             )}
 
-            {/* Loading skeleton for negotiation load */}
+            {/* Loading skeleton */}
             {isLoadingNegotiation && messages.length === 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {[1, 2, 3].map((i) => (
@@ -723,7 +763,7 @@ export default function SpeechToText() {
 
             {messages.length === 0 && !recording && !hasTranscript && !isLoadingNegotiation && (
               <div style={{ color: colors.muted, fontSize: 14 }}>
-                Press 🎤 to record your voice.
+                Press 🎤 to record. After transcription, send it — the bot will respond and speak back.
               </div>
             )}
 
@@ -737,7 +777,6 @@ export default function SpeechToText() {
                   alignItems: m.side === "left" ? "flex-start" : "flex-end",
                 }}
               >
-                {/* Old message (if edited) */}
                 {m.prevContent && (
                   <div
                     style={{
@@ -755,7 +794,6 @@ export default function SpeechToText() {
                   </div>
                 )}
 
-                {/* Current message */}
                 <ChatBubble
                   name={m.speaker}
                   content={editingIndex === i ? draft : m.content}
@@ -794,11 +832,7 @@ export default function SpeechToText() {
                 }}
               >
                 <div style={{ fontSize: 14, color: colors.muted, marginBottom: 4 }}>
-                  {sendingToBot ? (
-                    <span>Sending to Bot...</span>
-                  ) : (
-                    <span>Edit your transcript below, then press <b>Send to Bot</b>.</span>
-                  )}
+                  {sendingToBot ? <span>Sending to Bot...</span> : <span>Edit your transcript, then send.</span>}
                 </div>
 
                 <Textarea
@@ -822,25 +856,23 @@ export default function SpeechToText() {
                     Discard
                   </Button>
 
-                  <Button 
-                    size="sm" 
-                    onClick={sendTranscriptToBot}
-                    disabled={sendingToBot || !transcript.trim()}
-                  >
-                    {sendingToBot ? "Sending..." : "Send to Bot"}  
+                  <Button size="sm" onClick={sendTranscriptToBot} disabled={sendingToBot || !transcript.trim()}>
+                    {sendingToBot ? "Sending..." : "Send to Bot"}
                   </Button>
                 </div>
-                {/* Loading spinner */}
+
                 {sendingToBot && (
-                  <div style={{ 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    gap: 8,
-                    fontSize: 12,
-                    color: colors.muted,
-                    marginTop: 4
-                  }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      fontSize: 12,
+                      color: colors.muted,
+                      marginTop: 4,
+                    }}
+                  >
                     <div
                       style={{
                         width: 16,
@@ -853,12 +885,13 @@ export default function SpeechToText() {
                     />
                     <span>Processing your message...</span>
                   </div>
-                )}    
-              </div>  
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
 
+        {/* SETTINGS MODAL */}
         <Modal
           open={openSettings}
           onClose={() => setOpenSettings(false)}
@@ -870,33 +903,11 @@ export default function SpeechToText() {
               </Button>
               <Button
                 onClick={async () => {
-                  setOpenSettings(false);
                   try {
-                    const payload = {
-                      model: form.model,
-                      topic: form.topic,
-                      rules: form.rules,
-                      bot: {
-                        name: form.agent2.name,
-                        personality: form.agent2.persona,
-                        goal: form.agent2.stance,
-                      },
-                    };
-
-                    const res = await fetch(SETTINGS_URL, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(payload),
-                    });
-
-                    if (!res.ok) {
-                      throw new Error(`Failed to update settings (status ${res.status})`);
-                    }
-
-                    console.log("Settings updated successfully:", payload);
-                  } catch (err) {
-                    console.error("Error updating settings:", err);
-                    setError("Failed to save settings");
+                    await postSettings();
+                    setOpenSettings(false);
+                  } catch (e: any) {
+                    setError(e.message || "Failed to save settings");
                   }
                 }}
               >
@@ -905,7 +916,6 @@ export default function SpeechToText() {
             </>
           }
         >
-          {/* Model */}
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, color: colors.muted }}>Model</label>
             <select
@@ -921,27 +931,20 @@ export default function SpeechToText() {
                 color: colors.text,
               }}
             >
-              {/* OpenAI */}
               <option value="gpt-4o-mini">gpt-4o-mini</option>
               <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-5-nano">gpt-5-nano</option>
               <option value="gpt-5-mini">gpt-5-mini</option>
               <option value="gpt-5.2">gpt-5.2</option>
-
-              {/* DeepSeek */}
               <option value="deepseek-chat">deepseek-chat</option>
-
-              {/* Grok (use the exact IDs your backend supports) */}
               <option value="grok-4-1-fast-non-reasoning">grok-4-1-fast-non-reasoning</option>
               <option value="grok-4-1-fast-reasoning">grok-4-1-fast-reasoning</option>
-
-              {/* Gemini */}
               <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
               <option value="gemini-2.5-flash">gemini-2.5-flash</option>
               <option value="gemini-2.5-pro">gemini-2.5-pro</option>
             </select>
           </div>
 
-          {/* Topic */}
           <div style={{ marginBottom: 12 }}>
             <Input
               label="Topic"
@@ -950,7 +953,6 @@ export default function SpeechToText() {
             />
           </div>
 
-          {/* Rules */}
           <div style={{ marginBottom: 12 }}>
             <Textarea
               label="Rules"
@@ -960,7 +962,6 @@ export default function SpeechToText() {
             />
           </div>
 
-          {/* Bot Settings */}
           <div style={{ marginTop: 20 }}>
             <h4 style={{ marginBottom: 8 }}>Bot Configuration</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -984,9 +985,9 @@ export default function SpeechToText() {
             </div>
           </div>
         </Modal>
+
         {/* Prompt Inspector Side Panel with Tab */}
         <>
-          {/* Overlay to close panel when clicking outside */}
           {showPromptPanel && (
             <div
               onClick={() => setShowPromptPanel(false)}
@@ -1001,7 +1002,7 @@ export default function SpeechToText() {
               }}
             />
           )}
-          {/* Tab (always visible) */}
+
           <div
             onClick={() => setShowPromptPanel((v) => !v)}
             style={{
@@ -1033,13 +1034,11 @@ export default function SpeechToText() {
               e.currentTarget.style.background = colors.panel;
             }}
           >
-            {/* Three vertical lines */}
             <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
             <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
             <div style={{ width: "2px", height: "40px", background: colors.text, borderRadius: "2px" }} />
           </div>
 
-          {/* Panel (slides in/out) */}
           {showPromptPanel && (
             <div
               style={{
@@ -1064,37 +1063,49 @@ export default function SpeechToText() {
                 </Button>
               </div>
 
-              {/* System Prompt Section */}
               <div style={{ marginBottom: 24 }}>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 8,
+                    color: colors.muted,
+                  }}
+                >
                   System Prompt
                 </label>
                 <Textarea
                   rows={12}
                   value={systemPrompt || "No prompt sent yet..."}
                   onChange={(e) => setSystemPrompt(e.target.value)}
-                  style={{ 
-                    fontFamily: "monospace", 
+                  style={{
+                    fontFamily: "monospace",
                     fontSize: 12,
                     background: colors.panelAlt,
                   }}
                 />
-                <div style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
-                  This is the system message sent to the AI
-                </div>
+                <div style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>This is the system message sent to the AI</div>
               </div>
 
-              {/* Last User Message */}
               <div style={{ marginBottom: 24 }}>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 8,
+                    color: colors.muted,
+                  }}
+                >
                   Last User Message
                 </label>
                 <Textarea
                   rows={4}
                   value={lastPromptSent || "No message sent yet..."}
                   readOnly
-                  style={{ 
-                    fontFamily: "monospace", 
+                  style={{
+                    fontFamily: "monospace",
                     fontSize: 12,
                     background: colors.panelAlt,
                     opacity: 0.8,
@@ -1102,9 +1113,16 @@ export default function SpeechToText() {
                 />
               </div>
 
-              {/* Quick Override Section */}
               <div style={{ marginBottom: 24 }}>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 8,
+                    color: colors.muted,
+                  }}
+                >
                   Quick Override
                 </label>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1122,36 +1140,13 @@ export default function SpeechToText() {
                 </div>
               </div>
 
-              {/* Apply Button */}
               <Button
                 onClick={async () => {
                   try {
-                    const payload = {
-                      model: form.model,
-                      topic: form.topic,
-                      rules: form.rules,
-                      bot: {
-                        name: form.agent2.name,
-                        personality: form.agent2.persona,
-                        goal: form.agent2.stance,
-                      },
-                    };
-
-                    const res = await fetch(SETTINGS_URL, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(payload),
-                    });
-
-                    if (!res.ok) {
-                      throw new Error(`Failed to update settings (status ${res.status})`);
-                    }
-
-                    console.log("Prompt settings updated");
+                    await postSettings();
                     alert("Prompt settings applied!");
-                  } catch (err) {
-                    console.error("Error updating settings:", err);
-                    setError("Failed to apply prompt changes");
+                  } catch (e: any) {
+                    setError(e.message || "Failed to apply prompt changes");
                   }
                 }}
                 style={{ width: "100%" }}

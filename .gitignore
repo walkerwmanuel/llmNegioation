@@ -1,4 +1,16 @@
-backend/venv
-backend/.env
-*/**/__pycache__
-backend/.venv
+# Node
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Python
+.venv/
+backend/venv/
+__pycache__/
+
+# Logs
+*.log
+
+# Environment
+.env
