@@ -149,7 +149,7 @@ cp .env.development .env
 
 ### Start the Server
 ```bash
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8025
 ```
 
 ## CI/CD
