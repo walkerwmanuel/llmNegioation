@@ -2,6 +2,23 @@ import { Link } from "react-router-dom";
 import "./home.css";
 
 export default function Home() {
+  const blocks = [
+    {
+      title: "Text-to-Text (Bot-to-Bot)",
+      description: "Watch two AI agents negotiate a topic in real-time!",
+      href: "/text-to-text",
+    },
+    {
+      title: "Speech-to-Text (Human-to-Bot)",
+      description: "Practice real spoken negotiations",
+      href: "/speech-to-text",
+    },
+    {
+      title: "Speech-to-Speech (Human-to-Bot Multimodal)",
+      description: "Join the conversation, share ideas, and get inspired by others.",
+      href: "/speech-to-speech",
+    },
+  ];
   return (
     <>
       {/* NAV */}
@@ -33,7 +50,7 @@ export default function Home() {
           }}
         >
           <h2 style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}>
-            🔥 Check Out the Text-to-Text Bot v1 🔥
+            Check Out the Negotiation Bot v1 - Text-to-Text
           </h2>
           <p className="muted" style={{ marginBottom: "1rem", opacity: 0.9 }}>
             Watch two AI agents negotiate a topic in real-time!
@@ -75,7 +92,7 @@ export default function Home() {
         }}
       >
         <h2 style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>
-          🎙️ Try Negotiation Bot v2 — Live Speech Negotiation 🎙️
+          Try Negotiation Bot v2 — Speech-to-Text
         </h2>
         <p className="muted" style={{ marginBottom: "0.75rem", opacity: 0.9 }}>
           Practice real spoken negotiations — structured like an actual negotiation.
@@ -94,7 +111,52 @@ export default function Home() {
         </Link>
       </div>
     </section>
-
+      {/* NEGOTIATION MODES */}
+      <section className="container section" style={{ textAlign: "center", marginTop: "2rem", marginBottom: "3rem" }}>
+        <h2 style={{ fontSize: "2.5rem", marginBottom: "2.5rem", fontWeight: "700" }}>Negotiation Modes</h2>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "1.5rem",
+          }}
+        >
+          {blocks.map((block) => (
+            <Link
+              key={block.title}
+              to={block.href}
+              className="mode-card"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                aspectRatio: "1",
+                padding: "1.5rem",
+                borderRadius: "0.75rem",
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.06)",
+                textDecoration: "none",
+                color: "#fff",
+                transition: "all 0.3s ease",
+                textAlign: "left",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "2rem", marginBottom: "1rem" }}></div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "0.5rem", minHeight: "2.5rem" }}>
+                  {block.title}
+                </h3>
+                <p style={{ fontSize: "0.875rem", opacity: 0.8, lineHeight: "1.5" }}>
+                  {block.description}
+                </p>
+              </div>
+              <div style={{ textAlign: "right", marginTop: "1rem" }}>
+                <span style={{ fontSize: "1.25rem" }}>↗</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {/* HOW IT WORKS */}
       <section id="features" className="container section">

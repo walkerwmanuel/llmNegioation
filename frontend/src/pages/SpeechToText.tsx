@@ -803,9 +803,14 @@ export default function SpeechToText() {
           >
             <option value="gpt-4o-mini">gpt-4o-mini</option>
             <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-4.1">gpt-4.1</option>
+            <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+            <option value="gpt-5">gpt-5</option>            
             <option value="gpt-5-nano">gpt-5-nano</option>
             <option value="gpt-5-mini">gpt-5-mini</option>
+            <option value="gpt-5.1">gpt-5.1</option>
             <option value="gpt-5.2">gpt-5.2</option>
+            <option value="gpt-5.2-pro">gpt-5.2-pro</option>
           </select>
         </div>
           </div>
@@ -956,7 +961,7 @@ export default function SpeechToText() {
               {/* Last User Message */}
               <div style={{ marginBottom: 24 }}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8, color: colors.muted }}>
-                  Last User Message
+                  Last Payload
                 </label>
                 <Textarea
                   rows={4}
