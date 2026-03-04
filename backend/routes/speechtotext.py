@@ -30,6 +30,7 @@ class SpeechSettings(BaseModel):
 
 class TextPrompt(BaseModel):
     text: str
+    history: list[dict] = []
 
 # Store current settings globally
 current_settings: Optional[SpeechSettings] = None
@@ -85,56 +86,114 @@ async def respond_to_text(body: TextPrompt):
         if not user_text:
             return {"error": "Empty text provided"}
 
-        # Import the Agent class from wherever it's defined
-        from logic.openai import Agent
-        
-        # Create Agent objects (not dictionaries)
-        agent1 = Agent(
-            name=current_settings.bot.name,
-            personality=current_settings.bot.personality,
-            goal=current_settings.bot.goal
-        )
-        
-        agent2 = Agent(
-            name="You",
-            personality="You are the human user in this conversation.",
-            goal="Engage in the negotiation."
+        # Create system prompt
+        system_prompt = (
+            f"You are {current_settings.bot.name}.\n"
+            f"Personality: {current_settings.bot.personality}\n"
+            f"Goal: {current_settings.bot.goal}\n"
+            f"Negotiation topic: \"{current_settings.topic}\"\n\n"
+            f"{current_settings.rules}\n\n"
+            f"CONTEXT AWARENESS:\n"
+            f"- Read the full conversation history below\n"
+            f"- Reference what YOU ({current_settings.bot.name}) said in previous messages\n"            
         )
 
-        # Build existing transcript with user's latest message
-        existing_transcript = f"You:\n{user_text}\n\n"
+        # Build messages array from history
+        messages = [
+            {
+                "role": "developer", 
+                "content": [{"type": "text", "text": system_prompt}]
+            }
+        ]
 
-        # Collect the bot's response from runSimpleNegotiate
-        bot_response = ""
+        # Add conversation history
+        for msg in body.history:
+            if msg['speaker'] == 'You':
+                messages.append({
+                    "role": "user", 
+                    "content": [{"type": "text", "text": msg['content']}]
+                })
+            else:  # Bot message
+                messages.append({
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": msg['content']}]
+                })
         
-        for chunk_bytes in runSimpleNegotiate(
+        # Add current user message
+        messages.append({
+            "role": "user",
+            "content": [{"type": "text", "text": user_text}]
+        })
+
+        # Get bot response
+        response = client.chat.completions.create(
             model=current_settings.model,
-            agent1=agent1,
-            agent2=agent2,
-            topic=current_settings.topic,
-            rules=current_settings.rules,
-            rounds=1,
-            existing_transcript=existing_transcript,
-        ):
-            # Decode bytes to string
-            chunk_str = chunk_bytes.decode("utf-8").strip()
-            if not chunk_str:
-                continue
+            messages=messages,           
+            response_format={"type": "text"},
+            verbosity="medium",
+            reasoning_effort="medium",            
+            temperature=1,
+        )
+        
+        bot_response = response.choices[0].message.content.strip()
+        captured_prompt = system_prompt
+
+        return {
+            "you": user_text, 
+            "bot": bot_response,
+            "actual_system_prompt": captured_prompt
+        }
+
+        # # Import the Agent class from wherever it's defined
+        # from logic.openai import Agent
+        
+        # # Create Agent objects (not dictionaries)
+        # agent1 = Agent(
+        #     name=current_settings.bot.name,
+        #     personality=current_settings.bot.personality,
+        #     goal=current_settings.bot.goal
+        # )
+        
+        # agent2 = Agent(
+        #     name="You",
+        #     personality="You are the human user in this conversation.",
+        #     goal="Engage in the negotiation."
+        # )
+
+        # # Build existing transcript with user's latest message
+        # existing_transcript = f"You:\n{user_text}\n\n"
+
+        # # Collect the bot's response from runSimpleNegotiate
+        # bot_response = ""
+        
+        # for chunk_bytes in runSimpleNegotiate(
+        #     model=current_settings.model,
+        #     agent1=agent1,
+        #     agent2=agent2,
+        #     topic=current_settings.topic,
+        #     rules=current_settings.rules,
+        #     rounds=1,
+        #     existing_transcript=existing_transcript,
+        # ):
+        #     # Decode bytes to string
+        #     chunk_str = chunk_bytes.decode("utf-8").strip()
+        #     if not chunk_str:
+        #         continue
                 
-            try:
-                data = json.loads(chunk_str)
+        #     try:
+        #         data = json.loads(chunk_str)
                 
-                # Extract only the bot's response (agent1 in this case)
-                if data.get("type") == "turn" and data.get("speaker") == current_settings.bot.name:
-                    bot_response = data.get("content", "")
+        #         # Extract only the bot's response (agent1 in this case)
+        #         if data.get("type") == "turn" and data.get("speaker") == current_settings.bot.name:
+        #             bot_response = data.get("content", "")
                     
-            except json.JSONDecodeError:
-                continue
+        #     except json.JSONDecodeError:
+        #         continue
 
-        if not bot_response:
-            return {"error": "No response generated from bot"}
+        # if not bot_response:
+        #     return {"error": "No response generated from bot"}
 
-        return {"you": user_text, "bot": bot_response.strip()}
+        # return {"you": user_text, "bot": bot_response.strip()}
 
     except Exception as e:
         print(f"Error in respond_to_text: {str(e)}")

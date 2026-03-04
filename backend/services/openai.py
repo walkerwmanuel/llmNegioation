@@ -10,6 +10,8 @@ openai_key = os.getenv("OPENAI_API_KEY")
 deepseek_key = os.getenv("DEEPSEEK_API_KEY")
 xai_key = os.getenv("XAI_API_KEY")
 
+client = OpenAI(api_key=openai_key)
+
 if openai_key is None:
     raise ValueError("OPENAI_API_KEY not in .env file")
 
@@ -54,4 +56,15 @@ def get_openai_response(model: str, prompt: str) -> str:
         input=prompt
     )
     return response.output_text
+
+def get_openai_chat_response(model: str, system_prompt: str, user_message: str) -> str:
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ],
+        temperature=0.7,
+    )
+    return response.choices[0].message.content.strip()
 
