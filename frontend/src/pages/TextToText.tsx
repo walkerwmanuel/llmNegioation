@@ -41,7 +41,7 @@ type ChatItem =
       messageId?: number;
     };
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8025";
 const API_URL = `${API_BASE}/t2t-negotiate`;
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
