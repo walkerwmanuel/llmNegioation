@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 import tempfile
 from openai import OpenAI
 import json
+from shared import settings as shared_settings
+from shared.settings import BotConfig, SpeechSettings, current_settings
+
 
 # ====== FETCH KEY ======
 router = APIRouter()
@@ -17,29 +20,29 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-class BotConfig(BaseModel):
-    name: str
-    personality: str
-    goal: str
+# class BotConfig(BaseModel):
+#     name: str
+#     personality: str
+#     goal: str
 
-class SpeechSettings(BaseModel):
-    model: str
-    topic: str
-    rules: str
-    bot: BotConfig
+# class SpeechSettings(BaseModel):
+#     model: str
+#     topic: str
+#     rules: str
+#     bot: BotConfig
 
 class TextPrompt(BaseModel):
     text: str
     history: list[dict] = []
 
 # Store current settings globally
-current_settings: Optional[SpeechSettings] = None
+# current_settings: Optional[SpeechSettings] = None
 
 
 @router.post("/speech-to-text/update-settings")
 async def update_settings(settings: SpeechSettings):
-    global current_settings
-    current_settings = settings
+    shared_settings.current_settings = settings
+    print(f"Settings updated: bot={settings.bot.name}")
     return {"status": "success"}
 
 
@@ -79,7 +82,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
 @router.post("/speech-to-text/respond")
 async def respond_to_text(body: TextPrompt):
     try:
-        if current_settings is None:
+        if shared_settings.current_settings is None:
             return {"error": "Settings not configured. Call /update-settings first."}
 
         user_text = body.text.strip()
@@ -88,14 +91,14 @@ async def respond_to_text(body: TextPrompt):
 
         # Create system prompt
         system_prompt = (
-            f"You are {current_settings.bot.name}.\n"
-            f"Personality: {current_settings.bot.personality}\n"
-            f"Goal: {current_settings.bot.goal}\n"
-            f"Negotiation topic: \"{current_settings.topic}\"\n\n"
-            f"{current_settings.rules}\n\n"
+            f"You are {shared_settings.current_settings.bot.name}.\n"
+            f"Personality: {shared_settings.current_settings.bot.personality}\n"
+            f"Goal: {shared_settings.current_settings.bot.goal}\n"
+            f"Negotiation topic: \"{shared_settings.current_settings.topic}\"\n\n"
+            f"{shared_settings.current_settings.rules}\n\n"
             f"CONTEXT AWARENESS:\n"
             f"- Read the full conversation history below\n"
-            f"- Reference what YOU ({current_settings.bot.name}) said in previous messages\n"            
+            f"- Reference what YOU ({shared_settings.current_settings.bot.name}) said in previous messages\n"            
         )
 
         # Build messages array from history
@@ -127,7 +130,7 @@ async def respond_to_text(body: TextPrompt):
 
         # Get bot response
         response = client.chat.completions.create(
-            model=current_settings.model,
+            model=shared_settings.current_settings.model,
             messages=messages,           
             response_format={"type": "text"},
             verbosity="medium",
