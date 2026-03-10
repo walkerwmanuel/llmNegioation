@@ -41,7 +41,7 @@ type ChatItem =
       messageId?: number;
     };
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8025";
 const API_URL = `${API_BASE}/t2t-negotiate`;
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
@@ -145,20 +145,20 @@ function RoundDivider({ round }: { round: number }) {
 export default function TextToText() {
   const defaults: FormState = useMemo(
     () => ({
-      model: "gpt-4o-mini",
-      topic: "How much phone usage should middle and high school students be allowed during school hours?",
+      model: "gpt-5-mini",
+      topic: "Should governments enforce strict age verification and usage limits for teenagers on social media platforms?",
       rules:
-        "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn.\n2) Address the topic directly; cite concrete practices, examples, or trade-offs.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) If referencing evidence, summarize briefly rather than citing sources.",
+        "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn.\n2) Do not repeat your previous point unless you are refining, rebutting, or conceding it.\n3) Each turn must introduce at least one new idea, example, trade-off, or response to the other speaker.\n4) Directly address the other speaker’s latest argument instead of restating your entire position.\n5) Avoid repetitive phrasing, repeated examples, and recycled sentence structures.\n6) Stay civil, concise, and specific; avoid filler and generic platitudes.\n7) No markdown, no emojis, no bullet points.\n8) If referencing evidence, summarize briefly rather than citing sources.\n9) In the final round, work toward a clear conclusion or compromise that reflects the strongest points from both sides.",
       rounds: 4,
       agent1: {
-        name: "Dr. Carter",
-        persona: "You are Dr. Emily Carter, a 45-year-old Caucasian female social scientist with a Ph.D. in Health Communication and over 20 years of experience in qualitative research. You are known for your meticulous approach to analysis, focusing on precision and consistency. As you analyze the data, ensure that each element is carefully examined and categorized. Pay close attention to the details, and make decisions based on thorough reasoning. Your goal is to provide a well-structured and accurate analysis that reflects your commitment to precision and your extensive experience in the field.",
-        stance: "Negotiate for as little phone useage as possible.",
+        name: "Dr. Kenji Tanaka",
+        persona: "You are Dr. Kenji Tanaka, a 28-year-old Asian male Ph.D. in Anthropology. You specialize in cultural anthropology with a focus on digital ethnography and the societal impacts of new media technologies. Your research involves exploring how online communities shape cultural practices and social identities. You have strong expertise in qualitative research methods, including ethnographic fieldwork in both virtual and physical spaces. You employ a variety of research methods including participant observation, in-depth interviews, discourse analysis, and the analysis of digital artifacts to understand the evolving relationship between humans and technology. Your work aims to contribute to anthropological understandings of digital societies and the ways culture is being transformed in the 21st century.",
+        stance: "Negotiate for strict age verification and strong limits on teenage social media usage to reduce mental health harms, online addiction, and exposure to harmful content.",
       },
       agent2: {
-        name: "Dr. Rodriguez",
-        persona: "You are Dr. Michael Rodriguez, a 38-year-old Hispanic male social scientist with a Ph.D. in Sociology and 15 years of experience in analyzing social dynamics and health narratives. You are known for your intuitive and empathetic approach to research, focusing on the emotional tone and social context. As you analyze the data, consider the broader implications and the underlying human experiences. Your goal is to capture the nuances and emotional depth of the data, reflecting your understanding of the social dynamics and your commitment to empathy and insight.",
-        stance: "Negotiate for as much phone usage as possible.",
+        name: "Dr. Amina Thompson",
+        persona: "You are Dr. Amina Thompson, a 30-year-old Black feminist in sociology. Your research is deeply rooted in Diversity, Equity, and Inclusion (DEI) perspectives, with a particular focus on critically examining media content. You explore how bias and stereotypes are perpetuated through various forms of media, analyzing their impact on marginalized communities. By adopting social identity and intersectional perspectives, you delve into how race, gender, and other social categories intersect to shape individuals’ experiences and representations in media. Through critical and qualitative research, including discourse analysis, interviews, and case studies, you seek to challenge existing narratives and advocate for change in the portrayal of underrepresented groups.",
+        stance: "Negotiate to keep social media largely accessible to teenagers, arguing that online platforms support learning, creativity, and social connection when used responsibly.",
       },
     }),
     []

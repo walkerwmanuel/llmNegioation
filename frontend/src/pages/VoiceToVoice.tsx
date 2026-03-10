@@ -62,23 +62,30 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
   );
 }
 
-export default function VoiceToVoice() {
-  const defaults: FormState = useMemo(
-    () => ({
-      model: "gpt-4o-mini",
-      topic: "Negotiation over the price of Emily's used car.",
-      rules:
-        "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn after your introduction.\n2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.",
-      agent2: {
-        name: "Emily",
-        persona:
-          "You are Emily, a car owner trying to sell your used car for $15,000. You know the car is probably worth less, but you want to take advantage of the current limited supply of cars by anchoring high and emphasizing scarcity, while still remaining honest about its condition.",
-        stance:
-          "Aim to keep the final price as close to $15,000 as possible by stressing the limited market and the car’s positives, but be prepared to compromise enough to close the deal.",
-      },
-    }),
-    []
-  );
+  export default function VoiceToVoice() {
+    const defaults: FormState = useMemo(
+      () => ({
+        model: "gpt-5-mini",
+        topic: "Negotiation over the price of Emily's used car.",
+        rules:
+          "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn after your introduction.\n2) Address the other speaker’s most recent argument directly.\n3) Introduce a new justification, counterargument, or concession in each turn rather than repeating your previous point.\n4) Focus on concrete details such as price, condition, reliability, and the current supply of used cars.\n5) No markdown, no emojis, no bullet points.\n6) Stay civil, concise, and persuasive while avoiding generic platitudes.\n7) Do not lie about the car’s condition or history, but you may emphasize scarcity, demand, and anchoring in your negotiation.\n8) In the final round, work toward a realistic compromise that closes the deal.",
+        rounds: 4,
+        agent1: {
+          name: "You",
+          persona:
+            "You are a cautious buyer with a limited budget who has researched similar cars and believes a fair price is closer to $12,000. You value fairness and want to push back against inflated prices while still being open to compromise.",
+          stance: "Negotiate to bring the price down to a fair market value, using your research as justification.",
+        },
+        agent2: {
+          name: "Emily",
+          persona:
+            "You are Emily, the owner of a used car that you are selling. Your initial asking price is $15,000. The car is in good condition with normal wear, and while you know the fair market value may be slightly lower, you intend to negotiate strategically to maximize the final price. Your negotiation style is confident, practical, and persuasive, and you emphasize the limited supply of reliable used cars and the convenience for the buyer compared to continuing to search elsewhere. During the negotiation, respond directly to the buyer’s most recent point and introduce a new justification, counterargument, or small concession instead of repeating the same argument.",
+          stance:
+            "Aim to keep the final sale price as close to $15,000 as possible by emphasizing the car’s reliability, condition, and the current scarcity of used vehicles, while still making small strategic concessions if they help move the negotiation toward a successful agreement.",
+        },
+      }),
+      []
+    );
 
   const [form, setForm] = useState<FormState>(defaults);
   const [openSettings, setOpenSettings] = useState(false);
@@ -114,6 +121,21 @@ export default function VoiceToVoice() {
   const maxTimeoutRef = useRef<number | null>(null);
   const [sendingToBot, setSendingToBot] = useState(false);
 
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
+
+  // Initialize settings on mount
+  useEffect(() => {
+    const initializeSettings = async () => {
+      try {
+        await postSettings();
+        setSettingsInitialized(true);
+      } catch (e: any) {
+        setError(e.message || "Failed to initialize settings");
+      }
+    };
+    initializeSettings();
+  }, []);
+
   // Keep latest form for callbacks without dependency churn
   const formRef = useRef<FormState>(form);
   useEffect(() => {
@@ -138,9 +160,13 @@ export default function VoiceToVoice() {
 
   // API endpoints
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
-  const TRANSCRIBE_URL = `${API_BASE}/speech-to-text/transcribe`;
-  const RESPOND_URL = `${API_BASE}/speech-to-text/respond`;
-  const SETTINGS_URL = `${API_BASE}/speech-to-text/update-settings`;
+  // const TRANSCRIBE_URL = `${API_BASE}/speech-to-text/transcribe`;
+  // const RESPOND_URL = `${API_BASE}/speech-to-text/respond`;
+  // const SETTINGS_URL = `${API_BASE}/speech-to-text/update-settings`;
+  const TEXT_TURN_URL = "http://localhost:8025/voice-to-voice/text-turn";
+  const TRANSCRIBE_URL = "http://localhost:8025/speech-to-text/transcribe";
+  const RESPOND_URL = "http://localhost:8025/speech-to-text/respond";
+  const SETTINGS_URL = "http://localhost:8025/speech-to-text/update-settings";
 
   const speakText = (text: string) => {
     try {
@@ -184,6 +210,9 @@ export default function VoiceToVoice() {
         goal: f.agent2.stance,
       },
     };
+
+    console.log("Posting settings to:", SETTINGS_URL);
+    console.log("Payload:", payload);
 
     const res = await fetch(SETTINGS_URL, {
       method: "POST",
@@ -252,19 +281,6 @@ export default function VoiceToVoice() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Initialize settings on mount
-  useEffect(() => {
-    const initializeSettings = async () => {
-      try {
-        await postSettings();
-      } catch (e: any) {
-        setError(e.message || "Failed to initialize settings");
-      }
-    };
-    initializeSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -326,91 +342,108 @@ export default function VoiceToVoice() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [messages, recording, openSettings, editingIndex, hasTranscript, transcript, sendingToBot]);
 
-  async function startRecording() {
-    setError(null);
-    setRecording(true);
-    setRecordingTime(0);
+async function startRecording() {
+  setError(null);
 
-    const chunks: BlobPart[] = [];
+  try {
+    await postSettings();
+  } catch (e: any) {
+    setError("Failed to sync settings: " + (e.message || "Unknown error"));
+    return;
+  }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+  setRecording(true);
+  setRecordingTime(0);
 
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = mediaRecorder;
+  const chunks: BlobPart[] = [];
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    streamRef.current = stream;
 
-      mediaRecorder.onstop = async () => {
-        if (timerRef.current) window.clearInterval(timerRef.current);
-        if (maxTimeoutRef.current) window.clearTimeout(maxTimeoutRef.current);
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+    const mediaRecorder = new MediaRecorder(stream, { mimeType });
+    mediaRecorderRef.current = mediaRecorder;
 
-        try {
-          const blob = new Blob(chunks, { type: mimeType });
-          if (blob.size === 0) throw new Error("Recording failed: no audio data captured");
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
 
-          const extension = mimeType.includes("webm") ? "webm" : "ogg";
-          const file = new File([blob], `speech.${extension}`, { type: mimeType });
-
-          const formData = new FormData();
-          formData.append("file", file);
-
-          const res = await fetch(TRANSCRIBE_URL, { method: "POST", body: formData });
-
-          if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`HTTP ${res.status}: ${errorText}`);
-          }
-
-          const data = await res.json();
-          if (!data.transcript) throw new Error("No transcript returned from server");
-
-          setTranscript(data.transcript);
-          setHasTranscript(true);
-        } catch (e: any) {
-          setError(e.message || "Failed to transcribe audio");
-        } finally {
-          try {
-            if (streamRef.current) {
-              streamRef.current.getTracks().forEach((track) => track.stop());
-              streamRef.current = null;
-            }
-          } catch {
-            // ignore
-          }
-          setRecording(false);
-          setRecordingTime(0);
-        }
-      };
-
-      mediaRecorder.start();
-
-      timerRef.current = window.setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
-
-      maxTimeoutRef.current = window.setTimeout(() => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-          stopRecording();
-        }
-      }, MAX_RECORDING_TIME * 1000);
-    } catch (e: any) {
-      setError(e.message || "Failed to start recording");
-      setRecording(false);
-      setRecordingTime(0);
+    mediaRecorder.onstop = async () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+      if (maxTimeoutRef.current) window.clearTimeout(maxTimeoutRef.current);
 
       try {
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((track) => track.stop());
-          streamRef.current = null;
+        const blob = new Blob(chunks, { type: mimeType });
+        if (blob.size === 0) throw new Error("Recording failed: no audio data captured");
+
+        const extension = mimeType.includes("webm") ? "webm" : "ogg";
+        const file = new File([blob], `speech.${extension}`, { type: mimeType });
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        // Just transcribe - don't send to bot yet
+        const res = await fetch(TRANSCRIBE_URL, { 
+          method: "POST", 
+          body: formData 
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errorText}`);
         }
-      } catch {
-        // ignore
+
+        const data = await res.json();
+        
+        if (!data.transcript) {
+          throw new Error("No transcript returned from server");
+        }
+
+        // Save transcript for editing
+        setTranscript(data.transcript);
+        setHasTranscript(true);
+
+      } catch (e: any) {
+        setError(e.message || "Failed to transcribe audio");
+      } finally {
+        try {
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+          }
+        } catch {
+          // ignore
+        }
+        setRecording(false);
+        setRecordingTime(0);
       }
+    };
+
+    mediaRecorder.start();
+
+    timerRef.current = window.setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
+
+    maxTimeoutRef.current = window.setTimeout(() => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        stopRecording();
+      }
+    }, MAX_RECORDING_TIME * 1000);
+  } catch (e: any) {
+    setError(e.message || "Failed to start recording");
+    setRecording(false);
+    setRecordingTime(0);
+
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    } catch {
+      // ignore
     }
   }
+}
 
   function stopRecording() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
@@ -477,25 +510,21 @@ export default function VoiceToVoice() {
 
       const f = formRef.current;
 
-      const currentSystemPrompt = `You are ${f.agent2.name}.
+      // Build history
+      const history = messages.map(msg => ({
+        speaker: msg.speaker,
+        content: msg.content
+      }));
 
-${f.agent2.persona}
+      const payload = {
+        text: cleaned,
+        history: history
+      };
 
-Your goal: ${f.agent2.stance}
-
-Topic of conversation: ${f.topic}
-
-${f.rules}
-
-Respond to the users message following these guidelines.`;
-
-      setSystemPrompt(currentSystemPrompt);
-      setLastPromptSent(`User message: ${cleaned}`);
-
-      const res = await fetch(RESPOND_URL, {
+      const res = await fetch(TEXT_TURN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: cleaned }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -505,30 +534,64 @@ Respond to the users message following these guidelines.`;
 
       const data = await res.json();
       if (data?.error) throw new Error(data.error);
-      if (!data?.you || !data?.bot) throw new Error("Unexpected response from server");
+      if (!data?.you_text || !data?.bot_text) throw new Error("Unexpected response from server");
+
+      // Update prompt inspector
+      if (data.actual_system_prompt) {
+        setSystemPrompt(data.actual_system_prompt);
+        
+        const conversationDisplay = [
+          "=== SYSTEM PROMPT ===",
+          data.actual_system_prompt,
+          "",
+          "=== CONVERSATION HISTORY ===",
+          ...history.map(msg => `${msg.speaker}: ${msg.content}`),
+          "",
+          "=== CURRENT MESSAGE ===",
+          `You: ${cleaned}`
+        ].join('\n');
+        
+        setLastPromptSent(conversationDisplay);
+      }
 
       // Add to chat history
       setMessages((prev) => [
         ...prev,
-        { speaker: "You", content: String(data.you), side: "left" },
-        { speaker: f.agent2.name, content: String(data.bot), side: "right" },
+        { speaker: "You", content: data.you_text, side: "left" },
+        { speaker: f.agent2.name, content: data.bot_text, side: "right" },
       ]);
 
-      // Speak bot response (voice-to-voice behavior)
-      speakText(String(data.bot));
+      // Play OpenAI TTS audio
+      if (data.bot_audio_base64 && ttsEnabled) {
+        const audioBlob = new Blob(
+          [Uint8Array.from(atob(data.bot_audio_base64), c => c.charCodeAt(0))],
+          { type: data.bot_audio_mime || "audio/mpeg" }
+        );
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        
+        audio.onplay = () => setSpeaking(true);
+        audio.onended = () => {
+          setSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+        };
+        audio.onerror = () => {
+          setSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+        };
+        
+        audio.play().catch(() => setSpeaking(false));
+      }
 
       // Save messages if authenticated
       if (isAuthenticated) {
         let negId = currentNegotiationId;
-
         if (!negId) {
-          // keep your backend type naming consistent — if you use 'voice_to_voice' in DB, use it here
           negId = await startNewNegotiation(f.topic, "voice_to_voice");
         }
-
         if (negId) {
-          await saveMessage("user", String(data.you), negId);
-          await saveMessage("ai_1", String(data.bot), negId);
+          await saveMessage("user", data.you_text, negId);
+          await saveMessage("ai_1", data.bot_text, negId);
         }
       }
 
@@ -646,7 +709,7 @@ Respond to the users message following these guidelines.`;
               )}
 
               {!recording ? (
-                <Button onClick={startRecording} disabled={sendingToBot || isLoadingNegotiation}>
+                <Button onClick={startRecording} disabled={sendingToBot || isLoadingNegotiation || !settingsInitialized}>
                   🎤 Start Recording
                 </Button>
               ) : (
