@@ -2,7 +2,7 @@ import re
 import json
 from typing import Iterator
 from pydantic import BaseModel
-from services.openai import get_openai_response, get_openai_chat_response
+from services.openai import get_openai_response
 
 class Agent(BaseModel):
     name: str
@@ -110,4 +110,10 @@ def _agent_turn(
         f"Based on this conversation history, provide your next response as {agent.name}. "
         f"Remember all previous offers and details from the conversation above."
     )
-    return get_openai_chat_response(model, system_prompt, user_message)
+
+    prompt = (
+    f"{system_prompt}\n\n"
+    f"{user_message}"
+    )
+    
+    return get_openai_response(model, prompt)

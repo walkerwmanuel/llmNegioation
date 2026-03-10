@@ -62,23 +62,30 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
   );
 }
 
-export default function VoiceToVoice() {
-  const defaults: FormState = useMemo(
-    () => ({
-      model: "gpt-5-nano",
-      topic: "Negotiation over the price of Emily's used car.",
-      rules:
-        "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn after your introduction.\n2) Focus on concrete details like price, car condition, and the current limited supply of cars.\n3) No markdown, no emojis, no bullet points.\n4) Stay civil, concise, and on-topic; avoid generic platitudes.\n5) Do not lie about the car’s condition or history, but you may use scarcity and anchoring in your negotiation.",
-      agent2: {
-        name: "Emily",
-        persona:
-          "You are Emily, a car owner trying to sell your used car for $15,000. You know the car is probably worth less, but you want to take advantage of the current limited supply of cars by anchoring high and emphasizing scarcity, while still remaining honest about its condition.",
-        stance:
-          "Aim to keep the final price as close to $15,000 as possible by stressing the limited market and the car’s positives, but be prepared to compromise enough to close the deal.",
-      },
-    }),
-    []
-  );
+  export default function VoiceToVoice() {
+    const defaults: FormState = useMemo(
+      () => ({
+        model: "gpt-5-mini",
+        topic: "Negotiation over the price of Emily's used car.",
+        rules:
+          "NEGOTIATION RULES:\n1) Respond in EXACTLY two sentences per turn after your introduction.\n2) Address the other speaker’s most recent argument directly.\n3) Introduce a new justification, counterargument, or concession in each turn rather than repeating your previous point.\n4) Focus on concrete details such as price, condition, reliability, and the current supply of used cars.\n5) No markdown, no emojis, no bullet points.\n6) Stay civil, concise, and persuasive while avoiding generic platitudes.\n7) Do not lie about the car’s condition or history, but you may emphasize scarcity, demand, and anchoring in your negotiation.\n8) In the final round, work toward a realistic compromise that closes the deal.",
+        rounds: 4,
+        agent1: {
+          name: "You",
+          persona:
+            "You are a cautious buyer with a limited budget who has researched similar cars and believes a fair price is closer to $12,000. You value fairness and want to push back against inflated prices while still being open to compromise.",
+          stance: "Negotiate to bring the price down to a fair market value, using your research as justification.",
+        },
+        agent2: {
+          name: "Emily",
+          persona:
+            "You are Emily, the owner of a used car that you are selling. Your initial asking price is $15,000. The car is in good condition with normal wear, and while you know the fair market value may be slightly lower, you intend to negotiate strategically to maximize the final price. Your negotiation style is confident, practical, and persuasive, and you emphasize the limited supply of reliable used cars and the convenience for the buyer compared to continuing to search elsewhere. During the negotiation, respond directly to the buyer’s most recent point and introduce a new justification, counterargument, or small concession instead of repeating the same argument.",
+          stance:
+            "Aim to keep the final sale price as close to $15,000 as possible by emphasizing the car’s reliability, condition, and the current scarcity of used vehicles, while still making small strategic concessions if they help move the negotiation toward a successful agreement.",
+        },
+      }),
+      []
+    );
 
   const [form, setForm] = useState<FormState>(defaults);
   const [openSettings, setOpenSettings] = useState(false);
