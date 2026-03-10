@@ -12,6 +12,7 @@ import base64
 from fastapi import HTTPException
 from shared import settings as shared_settings
 from shared.settings import BotConfig, SpeechSettings, current_settings
+from services.openai import get_openai_response
 
 
 
@@ -227,13 +228,22 @@ async def voice_to_voice_turn(
             "content": [{"type": "text", "text": you_text}]
         })
 
-        response = client.chat.completions.create(
-            model=shared_settings.current_settings.model,
-            messages=messages,
-            temperature=1,
+        history_text = "\n\n".join(
+            f"{msg['speaker']}: {msg['content']}" for msg in history_list
         )
 
-        bot_text = response.choices[0].message.content.strip()
+        prompt = (
+            f"{system_prompt}\n\n"
+            f"Conversation so far:\n"
+            f"{history_text if history_text else '[no prior conversation]'}\n\n"
+            f"User: {you_text}\n\n"
+            f"Respond as {shared_settings.current_settings.bot.name}."
+        )
+
+        bot_text = get_openai_response(
+            shared_settings.current_settings.model,
+            prompt
+        ).strip()
 
         if not bot_text:
             raise HTTPException(status_code=500, detail="No response generated from bot.")
@@ -314,14 +324,22 @@ async def voice_to_voice_text_turn(body: TextTurnRequest):
             "content": [{"type": "text", "text": user_text}]
         })
 
-        # Get bot response
-        response = client.chat.completions.create(
-            model=shared_settings.current_settings.model,
-            messages=messages,
-            temperature=1,
+        history_text = "\n\n".join(
+            f"{msg['speaker']}: {msg['content']}" for msg in body.history
         )
 
-        bot_text = response.choices[0].message.content.strip()
+        prompt = (
+            f"{system_prompt}\n\n"
+            f"Conversation so far:\n"
+            f"{history_text if history_text else '[no prior conversation]'}\n\n"
+            f"User: {user_text}\n\n"
+            f"Respond as {shared_settings.current_settings.bot.name}."
+        )
+
+        bot_text = get_openai_response(
+            shared_settings.current_settings.model,
+            prompt
+        ).strip()
 
         if not bot_text:
             raise HTTPException(status_code=500, detail="No response generated from bot.")

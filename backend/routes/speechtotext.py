@@ -10,6 +10,7 @@ from openai import OpenAI
 import json
 from shared import settings as shared_settings
 from shared.settings import BotConfig, SpeechSettings, current_settings
+from services.openai import get_openai_response
 
 
 # ====== FETCH KEY ======
@@ -129,16 +130,25 @@ async def respond_to_text(body: TextPrompt):
         })
 
         # Get bot response
-        response = client.chat.completions.create(
-            model=shared_settings.current_settings.model,
-            messages=messages,           
-            response_format={"type": "text"},
-            verbosity="medium",
-            reasoning_effort="medium",            
-            temperature=1,
-        )
+        #/*response = client.chat.completions.create(
+        #   model=shared_settings.current_settings.model,
+        #   messages=messages,           
+        #   response_format={"type": "text"},
+        #   verbosity="medium",
+        #   reasoning_effort="medium",            
+        #   temperature=1,
+        #)
         
-        bot_response = response.choices[0].message.content.strip()
+        #bot_response = response.choices[0].message.content.strip()*/
+
+        prompt = system_prompt + "\n\nUser: " + user_text
+
+        bot_response = get_openai_response(
+            shared_settings.current_settings.model,
+            prompt
+        )
+
+
         captured_prompt = system_prompt
 
         return {
