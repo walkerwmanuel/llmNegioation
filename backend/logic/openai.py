@@ -96,14 +96,24 @@ def _agent_turn(
     transcript_so_far: str,
     rules: str,
 ) -> str:
-    prompt = (
+    system_prompt = (
         f"You are {agent.name}.\n"
         f"Personality: {agent.personality}\n"
         f"Goal: {agent.goal}\n"
         f"Negotiation topic: \"{topic}\"\n\n"
-        f"{rules}\n\n"
-        "Transcript so far:\n"
-        f"{transcript_so_far or '[start of negotiation]'}\n\n"
-        f"{agent.name}:"
+        f"{rules}"
     )
+
+    user_message = (
+        "Here is the conversation transcript so far:\n\n"
+        f"{transcript_so_far or '[start of negotiation]'}\n\n"
+        f"Based on this conversation history, provide your next response as {agent.name}. "
+        f"Remember all previous offers and details from the conversation above."
+    )
+
+    prompt = (
+    f"{system_prompt}\n\n"
+    f"{user_message}"
+    )
+    
     return get_openai_response(model, prompt)
