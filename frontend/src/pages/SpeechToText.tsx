@@ -34,6 +34,14 @@ type ChatItem = {
   tone?: FaceTone;
 };
 
+const modelOptions = [
+  "gpt-4o-mini",
+  "gpt-4o",
+  "gpt-5-nano",
+  "gpt-5-mini",
+  "gpt-5.2",
+];
+
 const spinnerKeyframes = `
   @keyframes spin {
     from {
@@ -214,6 +222,14 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
       }
     };
   }, []);
+
+  useEffect(() => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.side === "right" ? { ...m, speaker: form.agent2.name } : m
+      )
+    );
+  }, [form.agent2.name]);
 
   useEffect(() => {
   // Send initial settings to backend on component mount
@@ -443,9 +459,8 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
       setDraft("");
   
       if (item.speaker === "You") {
-
         await syncSettingsToBackend();
-
+  
         const res = await fetch(RESPOND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -500,56 +515,54 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
 
   async function sendTranscriptToBot() {
     if (sendingToBot) return;
+  
     try {
       setError(null);
       setSendingToBot(true);
-
+  
       const cleaned = transcript.trim();
       if (!cleaned) {
         throw new Error("Transcript is empty. Please type something before sending.");
       }
-
-      const currentSystemPrompt = `You are ${form.agent2.name}.
-
-  ${form.agent2.persona}
-
-  Your goal: ${form.agent2.stance}
-
-  Topic of conversation: ${form.topic}
-
-  ${form.rules}
-
-  Respond to the users message following these guidelines.`;
-
-      // Store it so we can display it in the panel
-      setSystemPrompt(currentSystemPrompt);
-      setLastPromptSent(`User message: ${cleaned}`);      
-
-
+  
       await syncSettingsToBackend();
-
+  
+      const currentSystemPrompt = `You are ${form.agent2.name}.
+  
+  ${form.agent2.persona}
+  
+  Your goal: ${form.agent2.stance}
+  
+  Topic of conversation: ${form.topic}
+  
+  ${form.rules}
+  
+  Respond to the users message following these guidelines.`;
+  
+      setSystemPrompt(currentSystemPrompt);
+      setLastPromptSent(`User message: ${cleaned}`);
+  
       const res = await fetch(RESPOND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: cleaned }),
       });
-
+  
       if (!res.ok) {
         const errorText = await res.text();
         throw new Error(`HTTP ${res.status}: ${errorText}`);
       }
-
+  
       const data = await res.json();
       console.log("Respond response:", data);
-
+  
       if (!data.you || !data.bot) {
         throw new Error("Unexpected response from server");
       }
-
-      // Add to chat history
+  
       const botTone = faceToneFromText(data.bot);
       setBotFaceTone(botTone);
-      
+  
       setMessages((prev) => [
         ...prev,
         { speaker: "You", content: data.you, side: "left" },
@@ -561,23 +574,20 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
           tone: botTone,
         },
       ]);
-      
+  
       await animateBotReply(data.bot);
-
-      // Save messages to backend if authenticated
+  
       if (isAuthenticated) {
-        // Start a new negotiation if we don't have one
         let negId = currentNegotiationId;
         if (!negId) {
-          negId = await startNewNegotiation(form.topic, 'user_vs_ai');
+          negId = await startNewNegotiation(form.topic, "user_vs_ai");
         }
         if (negId) {
-          await saveMessage('user', data.you, negId);
-          await saveMessage('ai_1', data.bot, negId);
+          await saveMessage("user", data.you, negId);
+          await saveMessage("ai_1", data.bot, negId);
         }
       }
-
-      // Clear the edit box
+  
       setTranscript("");
       setHasTranscript(false);
     } catch (err: any) {
@@ -1003,12 +1013,39 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
         >
           {/* Model */}
           <div style={{ marginBottom: 12 }}>
-            <Input
-              label="Model"
-              value={form.model}
-              onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-            />
-          </div>
+  <label
+    style={{
+      display: "block",
+      marginBottom: 6,
+      fontSize: 13,
+      fontWeight: 600,
+      color: colors.muted,
+    }}
+  >
+    Model
+  </label>
+
+  <select
+    value={form.model}
+    onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+    style={{
+      width: "100%",
+      padding: "10px 12px",
+      borderRadius: 8,
+      border: `1px solid ${colors.border}`,
+      background: colors.panelAlt,
+      color: colors.text,
+      outline: "none",
+      fontSize: 14,
+    }}
+  >
+    {modelOptions.map((model) => (
+      <option key={model} value={model}>
+        {model}
+      </option>
+    ))}
+  </select>
+</div>
 
           {/* Topic */}
           <div style={{ marginBottom: 12 }}>
