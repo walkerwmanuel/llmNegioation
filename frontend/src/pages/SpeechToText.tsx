@@ -34,14 +34,6 @@ type ChatItem = {
   tone?: FaceTone;
 };
 
-const modelOptions = [
-  "gpt-4o-mini",
-  "gpt-4o",
-  "gpt-5-nano",
-  "gpt-5-mini",
-  "gpt-5.2",
-];
-
 const spinnerKeyframes = `
   @keyframes spin {
     from {
@@ -153,9 +145,9 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
   const [sendingToBot, setSendingToBot] = useState(false);
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
-  const TRANSCRIBE_URL = "http://localhost:8025/speech-to-text/transcribe";
-  const RESPOND_URL = "http://localhost:8025/speech-to-text/respond";
-  const SETTINGS_URL = "http://localhost:8025/speech-to-text/update-settings";
+  const TRANSCRIBE_URL = `${API_BASE}/speech-to-text/transcribe`;
+  const RESPOND_URL = `${API_BASE}/speech-to-text/respond`;
+  const SETTINGS_URL = `${API_BASE}/speech-to-text/update-settings`;
 
   // Negotiation session hook for persistence
   const { isAuthenticated } = useAuth();
@@ -205,101 +197,6 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
     setMessages([]);
     setError(null);
   };
-
-  const sendTranscriptToBot = useCallback(async () => {
-    if (sendingToBot) return;
-    try {
-      setError(null);
-      setSendingToBot(true);
-
-      const cleaned = transcript.trim();
-      if (!cleaned) {
-        throw new Error("Transcript is empty. Please type something before sending.");
-      }
-
-    // Build history array
-    const history = messages.map(msg => ({
-      speaker: msg.speaker,
-      content: msg.content
-    }));
-
-    // Build what will actually be sent to backend
-    const requestPayload = { 
-      text: cleaned,
-      history: history
-    };
-
-    const res = await fetch(RESPOND_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestPayload),
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`HTTP ${res.status}: ${errorText}`);
-    }
-
-    const data = await res.json();
-    console.log("Respond response:", data);
-    console.log("Keys:", Object.keys(data));
-
-
-    if (data.error) {
-      throw new Error(data.error);  // surface backend errors clearly
-    }
-
-    if (!data.you || !data.bot) {
-      throw new Error("Unexpected response from server");
-    }
-
-    const actualPrompt = data.actual_system_prompt ?? "";
-    console.log("actual_system_prompt raw value:", data.actual_system_prompt);
-    setSystemPrompt(data.actual_system_prompt || "(empty — key was missing or blank)");
-
-    // Log debug info if present
-    if (data.debug_info) {
-      console.log("Debug info:", data.debug_info);
-    }
-
-    if (!data.you || !data.bot) {
-      throw new Error("Unexpected response from server");
-    }
-
-    const conversationDisplay = [
-      "=== SYSTEM PROMPT ===",
-      data.actual_system_prompt,
-      "",
-      "=== CONVERSATION HISTORY ===",
-      ...history.map(msg => `${msg.speaker}: ${msg.content}`),
-      "",
-      "=== CURRENT MESSAGE ===",
-      `You: ${cleaned}`,
-      "",
-      "=== REQUEST PAYLOAD ===",
-      JSON.stringify(requestPayload, null, 2)
-    ].join('\n');
-
-    setLastPromptSent(conversationDisplay);      
-
-    // Add to chat history
-    setMessages((prev) => [
-      ...prev,
-      { speaker: "You", content: data.you, side: "left" },
-      { speaker: form.agent2.name, content: data.bot, side: "right" },
-    ]);
-
-    // Clear the edit box
-    setTranscript("");
-    setHasTranscript(false);
-  } catch (err: any) {
-    console.error("Error sending transcript:", err);
-    setError(err.message || "Failed to send transcript to bot");
-  } finally {
-    setSendingToBot(false);
-  }
-}, [transcript, sendingToBot, form, RESPOND_URL, messages, isAuthenticated, currentNegotiationId, startNewNegotiation, saveMessage]);
-
 
   // Auto-scroll chat
   useEffect(() => {
@@ -612,94 +509,92 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
     setBotIsTalking(false);
   }
 
-//   async function sendTranscriptToBot() {
-//     if (sendingToBot) return;
-//     try {
-//       setError(null);
-//       setSendingToBot(true);
-
-//       const cleaned = transcript.trim();
-//       if (!cleaned) {
-//         throw new Error("Transcript is empty. Please type something before sending.");
-//       }
-
-//       // Build history array
-//       const history = messages.map(msg => ({
-//         speaker: msg.speaker,
-//         content: msg.content
-//       }));
-
-//       // Build request payload with history
-//       const requestPayload = { 
-//         text: cleaned,
-//         history: history
-//       };
-
-//       const res = await fetch(RESPOND_URL, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ text: cleaned }),
-//       });
-
-//       if (!res.ok) {
-//         const errorText = await res.text();
-//         throw new Error(`HTTP ${res.status}: ${errorText}`);
-//       }
-
-//       const data = await res.json();
-//       console.log("Respond response:", data);
-
-//       if (!data.you || !data.bot) {
-//         throw new Error("Unexpected response from server");
-//       }
-
-//     // Store system prompt for display panel
-//     setSystemPrompt(data.actual_system_prompt ?? "");
-
-//     // Build conversation display
-//     const conversationDisplay = [
-//       "=== SYSTEM PROMPT ===",
-//       data.actual_system_prompt,
-//       "",
-//       "=== CONVERSATION HISTORY ===",
-//       ...history.map(msg => `${msg.speaker}: ${msg.content}`),
-//       "",
-//       "=== CURRENT MESSAGE ===",
-//       `You: ${cleaned}`
-//     ].join('\n');
-
-//     setLastPromptSent(conversationDisplay);
-
-//       // Add to chat history
-//       setMessages((prev) => [
-//         ...prev,
-//         { speaker: "You", content: data.you, side: "left" },
-//         { speaker: form.agent2.name, content: data.bot, side: "right" },
-//       ]);
-
-//       // Save messages to backend if authenticated
-//       if (isAuthenticated) {
-//         // Start a new negotiation if we don't have one
-//         let negId = currentNegotiationId;
-//         if (!negId) {
-//           negId = await startNewNegotiation(form.topic, 'user_vs_ai');
-//         }
-//         if (negId) {
-//           await saveMessage('user', data.you, negId);
-//           await saveMessage('ai_1', data.bot, negId);
-//         }
-//       }
-
-//       // Clear the edit box
-//       setTranscript("");
-//       setHasTranscript(false);
-//     } catch (err: any) {
-//       console.error("Error sending transcript:", err);
-//       setError(err.message || "Failed to send transcript to bot");
-//     } finally {
-//       setSendingToBot(false);
-//     }
-//   }
+  async function sendTranscriptToBot() {
+    if (sendingToBot) return;
+  
+    try {
+      setError(null);
+      setSendingToBot(true);
+  
+      const cleaned = transcript.trim();
+      if (!cleaned) {
+        throw new Error("Transcript is empty. Please type something before sending.");
+      }
+  
+      await syncSettingsToBackend();
+  
+      const currentSystemPrompt = `You are ${form.agent2.name}.
+  
+  ${form.agent2.persona}
+  
+  Your goal: ${form.agent2.stance}
+  
+  Topic of conversation: ${form.topic}
+  
+  ${form.rules}
+  
+  Respond to the users message following these guidelines.`;
+  
+      setSystemPrompt(currentSystemPrompt);
+      setLastPromptSent(`User message: ${cleaned}`);
+  
+      const res = await fetch(RESPOND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: cleaned }),
+      });
+  
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
+      }
+  
+      const data = await res.json();
+      console.log("Respond response:", data);
+  
+      if (!data.you || !data.bot) {
+        throw new Error("Unexpected response from server");
+      }
+  
+      const botTone = faceToneFromText(data.bot);
+      setBotFaceTone(botTone);
+  
+      setMessages((prev) => [
+        ...prev,
+        { speaker: "You", content: data.you, side: "left" },
+        {
+          speaker: form.agent2.name,
+          content: data.bot,
+          side: "right",
+          animateWords: true,
+          tone: botTone,
+        },
+      ]);
+  
+      await animateBotReply(data.bot);
+  
+      if (isAuthenticated) {
+        let negId = currentNegotiationId;
+  
+        if (!negId) {
+          negId = await startNewNegotiation(form.topic, "user_vs_ai");
+        }
+  
+        if (negId) {
+          await saveMessage("user", data.you, negId);
+          await saveMessage("ai_1", data.bot, negId);
+        }
+      }
+  
+      setTranscript("");
+      setHasTranscript(false);
+    } catch (err: any) {
+      console.error("Error sending transcript:", err);
+      setError(err.message || "Failed to send transcript to bot");
+    } finally {
+      setSendingToBot(false);
+    }
+  }
 
   const chatTranscript = useMemo(() => {
   if (messages.length === 0) return "";
@@ -1149,39 +1044,6 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
               <option value="gemini-2.5-pro">gemini-2.5-pro</option>
             </select>
           </div>
-  <label
-    style={{
-      display: "block",
-      marginBottom: 6,
-      fontSize: 13,
-      fontWeight: 600,
-      color: colors.muted,
-    }}
-  >
-    Model
-  </label>
-
-  <select
-    value={form.model}
-    onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-    style={{
-      width: "100%",
-      padding: "10px 12px",
-      borderRadius: 8,
-      border: `1px solid ${colors.border}`,
-      background: colors.panelAlt,
-      color: colors.text,
-      outline: "none",
-      fontSize: 14,
-    }}
-  >
-    {modelOptions.map((model) => (
-      <option key={model} value={model}>
-        {model}
-      </option>
-    ))}
-  </select>
-</div>
 
           {/* Topic */}
           <div style={{ marginBottom: 12 }}>
