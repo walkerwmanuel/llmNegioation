@@ -13,7 +13,19 @@ from fastapi import HTTPException
 from shared import settings as shared_settings
 from shared.settings import BotConfig, SpeechSettings, current_settings
 from services.openai import get_openai_response
+import gender_guesser.detector as gender_detector
 
+_gender_detector = gender_detector.Detector(case_sensitive=False)
+
+def get_tts_voice(name: str) -> str:
+    first_name = name.strip().split()[0]
+    result = _gender_detector.get_gender(first_name)
+    if result in ("female", "mostly_female"):
+        return "coral"
+    elif result in ("male", "mostly_male"):
+        return "onyx"
+    else:
+        return "alloy"
 
 
 # ====== FETCH KEY ======
@@ -249,10 +261,10 @@ async def voice_to_voice_turn(
             raise HTTPException(status_code=500, detail="No response generated from bot.")
 
         # ---- 4) Synthesize bot voice (TTS) ----
-        # Pick a voice name you like (e.g., "alloy", "verse", etc.)
+        voice = get_tts_voice(shared_settings.current_settings.bot.name)
         tts = client.audio.speech.create(
             model="gpt-4o-mini-tts",
-            voice="coral",
+            voice=voice,
             input=bot_text,
             response_format="mp3",
         )
@@ -345,9 +357,10 @@ async def voice_to_voice_text_turn(body: TextTurnRequest):
             raise HTTPException(status_code=500, detail="No response generated from bot.")
 
         # Generate TTS
+        voice = get_tts_voice(shared_settings.current_settings.bot.name)
         tts = client.audio.speech.create(
             model="gpt-4o-mini-tts",
-            voice="coral",
+            voice=voice,
             input=bot_text,
             response_format="mp3",
         )
