@@ -71,7 +71,7 @@ export default function AnimatedBotFace({
     const skinTones = ["#F1C7A4", "#E7B98C", "#D9A074", "#C98B5F", "#B7774E"];
     const hairColors = ["#6B4E3D", "#3A2A20", "#1E1A18", "#8A5A3C", "#B07A50", "#4A2F1F"];
     const eyeColors = ["#2C1E16", "#1E3A5F", "#2E4F2E", "#4B2E5A"];
-    const lipColors = ["#7A3E2D", "#8B4A36", "#6B3448", "#9A4E3A"];
+    const lipColors = ["#A14F5F", "#B45A6A", "#8E4458", "#C06A7A"];
     const blushColors = [
       "rgba(255,120,140,0.20)",
       "rgba(255,140,160,0.16)",
@@ -86,12 +86,8 @@ export default function AnimatedBotFace({
       blush: blushColors[h % blushColors.length],
       glasses: h % 5 === 0,
       mole: h % 6 === 0,
-      lash: h % 2 === 0,
-      faceWidth: 72 + (h % 6),
-      faceHeight: 82 + (h % 5),
-      jawSoftness: 82 + (h % 8),
+      lash: true,
       noseShift: (h % 5) - 2,
-      hairStyle: h % 4,
       accessory: h % 7,
     };
   }, [name]);
@@ -100,8 +96,8 @@ export default function AnimatedBotFace({
     switch (tone) {
       case "friendly":
         return {
-          browLeft: "M84 88 Q100 80 116 88",
-          browRight: "M140 88 Q156 80 172 88",
+          browLeft: "M84 92 Q100 84 116 92",
+          browRight: "M140 92 Q156 84 172 92",
           eyeScaleY: 1,
           smile: true,
           frown: false,
@@ -110,8 +106,8 @@ export default function AnimatedBotFace({
         };
       case "firm":
         return {
-          browLeft: "M84 90 Q100 82 116 86",
-          browRight: "M140 86 Q156 82 172 90",
+          browLeft: "M84 94 Q100 86 116 90",
+          browRight: "M140 90 Q156 86 172 94",
           eyeScaleY: 0.95,
           smile: false,
           frown: false,
@@ -120,8 +116,8 @@ export default function AnimatedBotFace({
         };
       case "thinking":
         return {
-          browLeft: "M84 88 Q100 84 116 90",
-          browRight: "M140 86 Q156 80 172 86",
+          browLeft: "M84 92 Q100 88 116 94",
+          browRight: "M140 90 Q156 84 172 90",
           eyeScaleY: 0.95,
           smile: false,
           frown: false,
@@ -130,8 +126,8 @@ export default function AnimatedBotFace({
         };
       case "concerned":
         return {
-          browLeft: "M84 86 Q100 94 116 88",
-          browRight: "M140 88 Q156 94 172 86",
+          browLeft: "M84 90 Q100 98 116 92",
+          browRight: "M140 92 Q156 98 172 90",
           eyeScaleY: 0.9,
           smile: false,
           frown: true,
@@ -140,8 +136,8 @@ export default function AnimatedBotFace({
         };
       default:
         return {
-          browLeft: "M84 88 Q100 84 116 88",
-          browRight: "M140 88 Q156 84 172 88",
+          browLeft: "M84 92 Q100 88 116 92",
+          browRight: "M140 92 Q156 88 172 92",
           eyeScaleY: 1,
           smile: false,
           frown: false,
@@ -156,7 +152,7 @@ export default function AnimatedBotFace({
       if (expression.smile) {
         return (
           <path
-            d="M108 166 Q128 178 148 166"
+            d="M111 166 Q128 177 145 166"
             stroke={appearance.lips}
             strokeWidth="5"
             fill="none"
@@ -167,7 +163,7 @@ export default function AnimatedBotFace({
       if (expression.frown) {
         return (
           <path
-            d="M110 170 Q128 158 146 170"
+            d="M108 171 Q128 157 148 171"
             stroke={appearance.lips}
             strokeWidth="5"
             fill="none"
@@ -178,7 +174,7 @@ export default function AnimatedBotFace({
       if (expression.mouthLine) {
         return (
           <path
-            d="M112 166 L144 166"
+            d="M111 166 L145 166"
             stroke={appearance.lips}
             strokeWidth="5"
             fill="none"
@@ -198,59 +194,78 @@ export default function AnimatedBotFace({
     }
 
     if (mouthFrame === 0) {
-      return <ellipse cx="128" cy="166" rx="10" ry="6" fill={appearance.lips} />;
+      return <ellipse cx="128" cy="166" rx="11" ry="6.5" fill={appearance.lips} />;
     }
     if (mouthFrame === 1) {
-      return <ellipse cx="128" cy="166" rx="8" ry="11" fill={appearance.lips} />;
+      return <ellipse cx="128" cy="166" rx="8.5" ry="11.5" fill={appearance.lips} />;
     }
-    return <ellipse cx="128" cy="166" rx="12" ry="8" fill={appearance.lips} />;
+    return <ellipse cx="128" cy="166" rx="12.5" ry="8.5" fill={appearance.lips} />;
   }, [isTalking, mouthFrame, expression, appearance]);
 
-  const hair = useMemo(() => {
-    switch (appearance.hairStyle) {
-      case 0:
-        return (
-          <>
-            <path
-              d="M63 103 Q72 36 128 34 Q184 36 193 103 L193 118 Q177 92 152 84 Q138 80 128 80 Q118 80 104 84 Q79 92 63 118 Z"
-              fill={appearance.hair}
-            />
-            <path d="M70 95 Q78 78 90 68" stroke={appearance.hair} strokeWidth="12" strokeLinecap="round" />
-            <path d="M186 96 Q178 78 166 68" stroke={appearance.hair} strokeWidth="12" strokeLinecap="round" />
-          </>
-        );
-      case 1:
-        return (
-          <>
-            <path
-              d="M58 110 Q64 30 128 28 Q192 30 198 110 Q180 90 154 82 Q138 78 128 78 Q118 78 102 82 Q76 90 58 110 Z"
-              fill={appearance.hair}
-            />
-            <path d="M86 54 Q100 42 120 40" stroke={appearance.hair} strokeWidth="10" strokeLinecap="round" />
-          </>
-        );
-      case 2:
-        return (
-          <>
-            <path
-              d="M62 108 Q76 38 128 34 Q180 38 194 108 Q174 86 150 82 Q138 80 128 80 Q118 80 106 82 Q82 86 62 108 Z"
-              fill={appearance.hair}
-            />
-            <path d="M70 108 Q66 145 76 178" stroke={appearance.hair} strokeWidth="10" strokeLinecap="round" />
-            <path d="M186 108 Q190 145 180 178" stroke={appearance.hair} strokeWidth="10" strokeLinecap="round" />
-          </>
-        );
-      default:
-        return (
-          <>
-            <path
-              d="M60 102 Q70 34 128 32 Q186 34 196 102 L196 118 Q180 94 154 86 Q140 82 128 82 Q116 82 102 86 Q76 94 60 118 Z"
-              fill={appearance.hair}
-            />
-            <path d="M112 40 Q126 24 144 42" stroke={appearance.hair} strokeWidth="10" strokeLinecap="round" />
-          </>
-        );
-    }
+  const hairShape = useMemo(() => {
+    return (
+      <>
+        {/* Back/top hair mass - sits behind head, open around face */}
+        <path
+          d="
+            M70 90
+            Q82 50 128 42
+            Q174 50 186 90
+            Q194 122 192 170
+            Q190 198 176 214
+            Q168 220 160 214
+            Q154 208 154 196
+            Q154 156 154 126
+            Q154 102 168 86
+            Q150 76 128 74
+            Q106 76 88 86
+            Q102 102 102 126
+            Q102 156 102 196
+            Q102 208 96 214
+            Q88 220 80 214
+            Q66 198 64 170
+            Q62 122 70 90
+            Z
+          "
+          fill={appearance.hair}
+        />
+
+        {/* Left front section */}
+        <path
+          d="
+            M128 54
+            Q112 58 98 72
+            Q88 82 82 94
+            Q94 96 106 94
+            Q118 88 128 76
+            Z
+          "
+          fill={appearance.hair}
+        />
+
+        {/* Right front section */}
+        <path
+          d="
+            M128 54
+            Q144 58 158 72
+            Q168 82 174 94
+            Q162 96 150 94
+            Q138 88 128 76
+            Z
+          "
+          fill={appearance.hair}
+        />
+
+        {/* Center part seam */}
+        <path
+          d="M128 54 Q128 64 128 74"
+          stroke="rgba(255,255,255,0.18)"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+        />
+      </>
+    );
   }, [appearance]);
 
   return (
@@ -302,29 +317,39 @@ export default function AnimatedBotFace({
         }}
       >
         <svg viewBox="0 0 256 256" style={{ width: "92%", height: "92%" }}>
-          <ellipse
-            cx="128"
-            cy="132"
-            rx={appearance.faceWidth}
-            ry={appearance.faceHeight}
+          {hairShape}
+
+          {/* Head */}
+          <path
+            d="
+              M128 58
+              C158 58 182 84 182 120
+              C182 148 174 173 160 190
+              C150 202 139 210 128 212
+              C117 210 106 202 96 190
+              C82 173 74 148 74 120
+              C74 84 98 58 128 58
+              Z
+            "
             fill={appearance.skin}
           />
 
-          {hair}
-
-          <ellipse cx="88" cy="143" rx="10" ry="14" fill={appearance.skin} />
-          <ellipse cx="168" cy="143" rx="10" ry="14" fill={appearance.skin} />
+          {/* Ears */}
+          <ellipse cx="88" cy="144" rx="9" ry="13" fill={appearance.skin} />
+          <ellipse cx="168" cy="144" rx="9" ry="13" fill={appearance.skin} />
 
           {expression.blush && (
             <>
-              <ellipse cx="92" cy="160" rx="10" ry="5" fill={appearance.blush} />
-              <ellipse cx="164" cy="160" rx="10" ry="5" fill={appearance.blush} />
+              <ellipse cx="92" cy="152" rx="10" ry="5" fill={appearance.blush} />
+              <ellipse cx="164" cy="152" rx="10" ry="5" fill={appearance.blush} />
             </>
           )}
 
+          {/* Brows */}
           <path d={expression.browLeft} stroke="#4B3427" strokeWidth="4" fill="none" strokeLinecap="round" />
           <path d={expression.browRight} stroke="#4B3427" strokeWidth="4" fill="none" strokeLinecap="round" />
 
+          {/* Eyes */}
           {!blink ? (
             <>
               <ellipse
@@ -343,6 +368,8 @@ export default function AnimatedBotFace({
               />
               <circle cx="104" cy="112" r="2.5" fill="#fff" />
               <circle cx="156" cy="112" r="2.5" fill="#fff" />
+              <path d="M92 104 Q102 96 112 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
+              <path d="M144 104 Q154 96 164 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
               {appearance.lash && (
                 <>
                   <path d="M95 102 L90 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
@@ -369,8 +396,9 @@ export default function AnimatedBotFace({
             </>
           )}
 
+          {/* Nose */}
           <path
-            d={`M128 122 Q${122 + appearance.noseShift} 145 ${129 + appearance.noseShift} 150`}
+            d={`M128 122 Q${122 + appearance.noseShift} 145 ${129 + appearance.noseShift} 151`}
             stroke="#C48D6B"
             strokeWidth="3"
             fill="none"
@@ -379,13 +407,14 @@ export default function AnimatedBotFace({
 
           {appearance.mole && <circle cx="154" cy="154" r="1.8" fill="#7A4E3A" />}
 
+          {/* Mouth */}
           {mouth}
 
-          {appearance.accessory === 0 && (
-            <circle cx="182" cy="148" r="3.5" fill="#D4AF37" opacity={0.9} />
-          )}
           {appearance.accessory === 1 && (
-            <circle cx="74" cy="148" r="3.5" fill="#D4AF37" opacity={0.9} />
+            <>
+              <path d="M70 150 Q74 156 78 150" stroke="#D4AF37" strokeWidth="2" fill="none" />
+              <path d="M178 150 Q182 156 186 150" stroke="#D4AF37" strokeWidth="2" fill="none" />
+            </>
           )}
         </svg>
       </div>
