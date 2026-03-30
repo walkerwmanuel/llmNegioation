@@ -14,6 +14,7 @@ import { NegotiationLayout } from "../components/layout/NegotiationLayout";
 import { useNegotiationSession } from "../hooks/useNegotiationSession";
 import { useAuth } from "../context/AuthContext";
 import AnimatedBotFace, { faceToneFromText, type FaceTone } from "../components/AnimatedBotFace";
+import { API } from "../config/api";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -144,10 +145,9 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
   const maxTimeoutRef = useRef<number | null>(null);
   const [sendingToBot, setSendingToBot] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
-  const TRANSCRIBE_URL = "http://localhost:8025/speech-to-text/transcribe";
-  const RESPOND_URL = "http://localhost:8025/speech-to-text/respond";
-  const SETTINGS_URL = "http://localhost:8025/speech-to-text/update-settings";
+const TRANSCRIBE_URL = API.speechToText.transcribe;
+const RESPOND_URL = API.speechToText.respond;
+const SETTINGS_URL = API.speechToText.updateSettings;
 
   // Negotiation session hook for persistence
   const { isAuthenticated } = useAuth();
