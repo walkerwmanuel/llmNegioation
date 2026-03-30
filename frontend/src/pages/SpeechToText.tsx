@@ -145,9 +145,9 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
   const [sendingToBot, setSendingToBot] = useState(false);
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
-  const TRANSCRIBE_URL = "http://localhost:8000/speech-to-text/transcribe";
-  const RESPOND_URL = "http://localhost:8000/speech-to-text/respond";
-  const SETTINGS_URL = "http://localhost:8000/speech-to-text/update-settings";
+  const TRANSCRIBE_URL = "http://localhost:8025/speech-to-text/transcribe";
+  const RESPOND_URL = "http://localhost:8025/speech-to-text/respond";
+  const SETTINGS_URL = "http://localhost:8025/speech-to-text/update-settings";
 
   // Negotiation session hook for persistence
   const { isAuthenticated } = useAuth();
