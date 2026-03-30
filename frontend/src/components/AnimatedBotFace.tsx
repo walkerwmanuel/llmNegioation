@@ -1,25 +1,53 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { colors } from "./ui/colors";
 
-export type FaceTone = "neutral" | "friendly" | "firm" | "thinking" | "concerned";
+export type FaceTone =
+  | "neutral"
+  | "friendly"
+  | "firm"
+  | "thinking"
+  | "concerned"
+  | "angry"
+  | "skeptical";
 
-export function faceToneFromText(text: string): FaceTone {
+function countMatches(text: string, pattern: RegExp) {
+  return (text.match(pattern) || []).length;
+}
+
+function scoreTone(text: string) {
   const t = (text || "").toLowerCase();
 
-  if (/(thank|glad|appreciate|happy|great|fair|together|understand)/.test(t)) {
-    return "friendly";
-  }
-  if (/(must|need to|won't|cannot|can't|firm|final|nonnegotiable|confident)/.test(t)) {
-    return "firm";
-  }
-  if (/(maybe|perhaps|consider|could|might|option|what if)/.test(t)) {
-    return "thinking";
-  }
-  if (/(concern|risk|worry|issue|problem|difficult|unfortunately)/.test(t)) {
-    return "concerned";
-  }
+  const friendly = countMatches(
+    t,
+    /\b(thank|thanks|glad|appreciate|happy|great|excellent|fair|together|understand|good|pleased|welcome|love|helpful|awesome|sure|absolutely)\b/g
+  );
 
-  return "neutral";
+  const firm = countMatches(
+    t,
+    /\b(must|need to|needs to|require|required|won't|will not|cannot|can't|firm|final|nonnegotiable|confident|clearly|definitely|policy|deadline|expect|necessary|important|should|have to|value|price|market|maintained|reliability|performance|serious|stand by|justify)\b/g
+  );
+
+  const thinking = countMatches(
+    t,
+    /\b(maybe|perhaps|consider|could|might|option|what if|possibly|probably|explore|alternative|suggest|wonder|depends)\b/g
+  );
+
+  const concerned = countMatches(
+    t,
+    /\b(concern|concerned|risk|worry|worried|issue|problem|difficult|unfortunately|unsafe|danger|delay|blocked|blocking|stuck|uncertain|hard|trouble|conflict|fail|failure|wrong|error|lowball|cheap)\b/g
+  );
+
+  const angry = countMatches(
+    t,
+    /\b(ugly|stupid|dumb|ridiculous|insult|insulting|rude|harsh|attack|offensive|absurd|nonsense|terrible|awful|pathetic|annoying|mad|angry|furious|disrespectful|joke|crazy|wildly low|egregious|low offer|lowball)\b/g
+  );
+
+  const skeptical = countMatches(
+    t,
+    /\b(really|actually|seriously|supposedly|apparently|claim|claims|doubt|questionable|not sure|skeptical|unclear|unlikely|hard to believe)\b/g
+  );
+
+  return { friendly, firm, thinking, concerned, angry, skeptical };
 }
 
 function hashString(str: string) {
@@ -31,26 +59,93 @@ function hashString(str: string) {
   return Math.abs(h);
 }
 
+function getSentences(text: string) {
+  return (text || "")
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function getLastSentence(text: string) {
+  const parts = getSentences(text);
+  return parts.length ? parts[parts.length - 1] : (text || "").trim();
+}
+
+function toneStrength(text: string, userText = "") {
+  const own = scoreTone(text);
+  const user = scoreTone(userText);
+  return Math.max(
+    own.friendly + user.friendly,
+    own.firm + user.firm,
+    own.thinking + user.thinking,
+    own.concerned + user.concerned,
+    own.angry + user.angry,
+    own.skeptical + user.skeptical
+  );
+}
+
+export function faceToneFromText(text: string, userText = ""): FaceTone {
+  const own = scoreTone(text);
+  const user = scoreTone(userText);
+
+  const friendly = own.friendly;
+  const firm = own.firm + Math.floor(user.firm * 0.45);
+  const thinking = own.thinking;
+  const concerned = own.concerned + user.concerned + Math.floor(user.firm * 0.25);
+  const angry = own.angry + user.angry + (/\$\s?\d|offer|price|pay|cost|worth/.test(userText.toLowerCase()) && /\b(too much|low|cheap|ridiculous|absurd|joke|ugly)\b/.test(userText.toLowerCase()) ? 1 : 0);
+  const skeptical = own.skeptical + Math.floor(user.skeptical * 0.5);
+
+  if (angry >= 1 && angry >= concerned && angry >= firm && angry >= friendly && angry >= thinking) {
+    return "angry";
+  }
+
+  if (concerned >= 1 && concerned >= firm && concerned >= friendly && concerned >= thinking) {
+    return "concerned";
+  }
+
+  if (firm >= 1 && firm >= friendly && firm >= thinking) {
+    return "firm";
+  }
+
+  if (skeptical >= 1 && skeptical >= thinking && skeptical >= friendly) {
+    return "skeptical";
+  }
+
+  if (thinking >= 2 && thinking > firm && thinking > concerned && thinking > friendly) {
+    return "thinking";
+  }
+
+  if (friendly >= 3 && friendly > firm + 1 && friendly > concerned + 1 && angry === 0) {
+    return "friendly";
+  }
+
+  return "neutral";
+}
+
+function sentenceVariant(text: string) {
+  const h = hashString(text || "default");
+  return (h % 3) - 1; // -1, 0, 1
+}
+
 export default function AnimatedBotFace({
   name,
   tone = "neutral",
   isTalking = false,
+  botText = "",
+  liveText = "",
+  userText = "",
 }: {
   name: string;
   tone?: FaceTone;
   isTalking?: boolean;
+  botText?: string;
+  liveText?: string;
+  userText?: string;
 }) {
-  const [blink, setBlink] = useState(false);
   const [mouthFrame, setMouthFrame] = useState(0);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setBlink(true);
-      window.setTimeout(() => setBlink(false), 140);
-    }, 2600);
-
-    return () => window.clearInterval(timer);
-  }, []);
+  const [eyeOffsetX, setEyeOffsetX] = useState(0);
+  const [eyeOffsetY, setEyeOffsetY] = useState(0);
+  const [settledTone, setSettledTone] = useState<FaceTone>(tone);
 
   useEffect(() => {
     if (!isTalking) {
@@ -64,6 +159,123 @@ export default function AnimatedBotFace({
 
     return () => window.clearInterval(timer);
   }, [isTalking]);
+
+  const activeSpeechText = useMemo(() => {
+    return isTalking ? (liveText || botText) : botText;
+  }, [isTalking, liveText, botText]);
+
+  const activeSentence = useMemo(() => {
+    return getLastSentence(activeSpeechText);
+  }, [activeSpeechText]);
+
+  const detectedSentenceTone = useMemo(() => {
+    const sentence = activeSentence || botText;
+    if (!sentence.trim() && tone) return tone;
+    return faceToneFromText(sentence, userText);
+  }, [activeSentence, botText, userText, tone]);
+
+  const overallTone = useMemo(() => {
+    if (!botText.trim()) return tone;
+    const inferred = faceToneFromText(botText, userText);
+    const strength = toneStrength(botText, userText);
+    if (strength === 0) return tone;
+    return inferred;
+  }, [botText, userText, tone]);
+
+  useEffect(() => {
+    if (isTalking) {
+      setSettledTone(detectedSentenceTone);
+    } else {
+      setSettledTone(overallTone);
+    }
+  }, [isTalking, detectedSentenceTone, overallTone]);
+
+  const displayedTone = isTalking ? detectedSentenceTone : settledTone;
+  const sentenceShift = useMemo(() => sentenceVariant(activeSentence || botText || name), [activeSentence, botText, name]);
+
+  useEffect(() => {
+    if (!isTalking) {
+      let baseX = 0;
+      let baseY = 0;
+
+      switch (displayedTone) {
+        case "angry":
+          baseX = 0;
+          baseY = -0.35;
+          break;
+        case "firm":
+          baseX = 0.2;
+          baseY = -0.2;
+          break;
+        case "concerned":
+          baseX = -0.25;
+          baseY = 0.25;
+          break;
+        case "thinking":
+          baseX = 0.45;
+          baseY = -0.45;
+          break;
+        case "skeptical":
+          baseX = 0.5;
+          baseY = -0.1;
+          break;
+        case "friendly":
+          baseX = 0.15;
+          baseY = 0.1;
+          break;
+        default:
+          baseX = 0;
+          baseY = 0;
+      }
+
+      setEyeOffsetX(baseX);
+      setEyeOffsetY(baseY);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      let baseX = 0;
+      let baseY = 0;
+
+      switch (displayedTone) {
+        case "angry":
+          baseX = 0.15;
+          baseY = -0.5;
+          break;
+        case "firm":
+          baseX = 0.8;
+          baseY = -0.25;
+          break;
+        case "concerned":
+          baseX = -0.8;
+          baseY = 0.6;
+          break;
+        case "thinking":
+          baseX = 1.1;
+          baseY = -1.0;
+          break;
+        case "skeptical":
+          baseX = 0.95;
+          baseY = -0.2;
+          break;
+        case "friendly":
+          baseX = 0.35;
+          baseY = 0.15;
+          break;
+        default:
+          baseX = 0;
+          baseY = 0.1;
+      }
+
+      const randX = (Math.random() - 0.5) * 1.5;
+      const randY = (Math.random() - 0.5) * 1.1;
+
+      setEyeOffsetX(baseX + randX);
+      setEyeOffsetY(baseY + randY);
+    }, 140);
+
+    return () => window.clearInterval(timer);
+  }, [isTalking, displayedTone]);
 
   const appearance = useMemo(() => {
     const h = hashString(name || "bot");
@@ -93,62 +305,113 @@ export default function AnimatedBotFace({
   }, [name]);
 
   const expression = useMemo(() => {
-    switch (tone) {
+    const v = sentenceShift;
+
+    switch (displayedTone) {
       case "friendly":
         return {
-          browLeft: "M84 92 Q100 84 116 92",
-          browRight: "M140 92 Q156 84 172 92",
-          eyeScaleY: 1,
+          browLeft: `M84 93 Q100 ${84 + v} 116 93`,
+          browRight: `M140 93 Q156 ${84 - v} 172 93`,
+          eyeScaleY: 1.03,
           smile: true,
           frown: false,
           mouthLine: false,
           blush: true,
+          pupilsNarrow: false,
         };
       case "firm":
         return {
-          browLeft: "M84 94 Q100 86 116 90",
-          browRight: "M140 90 Q156 86 172 94",
-          eyeScaleY: 0.95,
+          browLeft: `M84 96 Q100 ${84 + v} 116 88`,
+          browRight: `M140 88 Q156 ${84 - v} 172 96`,
+          eyeScaleY: 0.86,
           smile: false,
           frown: false,
           mouthLine: true,
           blush: false,
+          pupilsNarrow: true,
         };
       case "thinking":
         return {
-          browLeft: "M84 92 Q100 88 116 94",
-          browRight: "M140 90 Q156 84 172 90",
+          browLeft: `M84 93 Q100 ${86 + v} 116 97`,
+          browRight: `M140 91 Q156 ${80 - v} 172 88`,
+          eyeScaleY: 0.9,
+          smile: false,
+          frown: false,
+          mouthLine: false,
+          blush: false,
+          pupilsNarrow: false,
+        };
+      case "concerned":
+        return {
+          browLeft: `M84 88 Q100 ${101 + v} 116 95`,
+          browRight: `M140 95 Q156 ${101 - v} 172 88`,
+          eyeScaleY: 0.8,
+          smile: false,
+          frown: true,
+          mouthLine: false,
+          blush: false,
+          pupilsNarrow: true,
+        };
+      case "skeptical":
+        return {
+          browLeft: `M84 92 Q100 ${87 + v} 116 96`,
+          browRight: `M140 91 Q156 ${90 - v} 172 91`,
+          eyeScaleY: 0.88,
+          smile: false,
+          frown: false,
+          mouthLine: false,
+          blush: false,
+          pupilsNarrow: true,
+        };
+      case "angry":
+        return {
+          browLeft: `M84 98 Q100 ${78 + v} 116 88`,
+          browRight: `M140 88 Q156 ${78 - v} 172 98`,
+          eyeScaleY: 0.72,
+          smile: false,
+          frown: true,
+          mouthLine: false,
+          blush: false,
+          pupilsNarrow: true,
+        };
+      default:
+        return {
+          browLeft: `M84 92 Q100 ${88 + v} 116 92`,
+          browRight: `M140 92 Q156 ${88 - v} 172 92`,
           eyeScaleY: 0.95,
           smile: false,
           frown: false,
           mouthLine: false,
           blush: false,
-        };
-      case "concerned":
-        return {
-          browLeft: "M84 90 Q100 98 116 92",
-          browRight: "M140 92 Q156 98 172 90",
-          eyeScaleY: 0.9,
-          smile: false,
-          frown: true,
-          mouthLine: false,
-          blush: false,
-        };
-      default:
-        return {
-          browLeft: "M84 92 Q100 88 116 92",
-          browRight: "M140 92 Q156 88 172 92",
-          eyeScaleY: 1,
-          smile: false,
-          frown: false,
-          mouthLine: false,
-          blush: false,
+          pupilsNarrow: false,
         };
     }
-  }, [tone]);
+  }, [displayedTone, sentenceShift]);
 
   const mouth = useMemo(() => {
     if (!isTalking) {
+      if (displayedTone === "angry") {
+        return (
+          <path
+            d="M110 171 Q128 159 146 171"
+            stroke={appearance.lips}
+            strokeWidth="5"
+            fill="none"
+            strokeLinecap="round"
+          />
+        );
+      }
+      if (displayedTone === "skeptical") {
+        return (
+          <path
+            d="M112 168 Q126 169 141 165"
+            stroke={appearance.lips}
+            strokeWidth="5"
+            fill="none"
+            strokeLinecap="round"
+          />
+        );
+      }
       if (expression.smile) {
         return (
           <path
@@ -193,19 +456,44 @@ export default function AnimatedBotFace({
       );
     }
 
-    if (mouthFrame === 0) {
-      return <ellipse cx="128" cy="166" rx="11" ry="6.5" fill={appearance.lips} />;
+    if (displayedTone === "angry") {
+      if (mouthFrame === 0) return <ellipse cx="128" cy="167" rx="9.5" ry="5.5" fill={appearance.lips} />;
+      if (mouthFrame === 1) return <ellipse cx="128" cy="167" rx="7.2" ry="10.8" fill={appearance.lips} />;
+      return <ellipse cx="128" cy="167" rx="10.5" ry="7.0" fill={appearance.lips} />;
     }
-    if (mouthFrame === 1) {
-      return <ellipse cx="128" cy="166" rx="8.5" ry="11.5" fill={appearance.lips} />;
+
+    if (displayedTone === "firm") {
+      if (mouthFrame === 0) return <ellipse cx="128" cy="166" rx="10" ry="5.5" fill={appearance.lips} />;
+      if (mouthFrame === 1) return <ellipse cx="128" cy="166" rx="7.5" ry="10.5" fill={appearance.lips} />;
+      return <ellipse cx="128" cy="166" rx="11" ry="7" fill={appearance.lips} />;
     }
-    return <ellipse cx="128" cy="166" rx="12.5" ry="8.5" fill={appearance.lips} />;
-  }, [isTalking, mouthFrame, expression, appearance]);
+
+    if (displayedTone === "concerned") {
+      if (mouthFrame === 0) return <ellipse cx="128" cy="167" rx="10" ry="6.5" fill={appearance.lips} />;
+      if (mouthFrame === 1) return <ellipse cx="128" cy="167" rx="8" ry="11.5" fill={appearance.lips} />;
+      return <ellipse cx="128" cy="167" rx="11" ry="8" fill={appearance.lips} />;
+    }
+
+    if (displayedTone === "skeptical") {
+      if (mouthFrame === 0) return <ellipse cx="128" cy="166" rx="10.2" ry="5.8" fill={appearance.lips} />;
+      if (mouthFrame === 1) return <ellipse cx="128" cy="166" rx="8.1" ry="10.3" fill={appearance.lips} />;
+      return <ellipse cx="128" cy="166" rx="11.2" ry="7.4" fill={appearance.lips} />;
+    }
+
+    if (displayedTone === "friendly") {
+      if (mouthFrame === 0) return <ellipse cx="128" cy="166" rx="11.5" ry="6.5" fill={appearance.lips} />;
+      if (mouthFrame === 1) return <ellipse cx="128" cy="166" rx="9" ry="11" fill={appearance.lips} />;
+      return <ellipse cx="128" cy="166" rx="12.5" ry="8.5" fill={appearance.lips} />;
+    }
+
+    if (mouthFrame === 0) return <ellipse cx="128" cy="166" rx="10.5" ry="6" fill={appearance.lips} />;
+    if (mouthFrame === 1) return <ellipse cx="128" cy="166" rx="8" ry="11" fill={appearance.lips} />;
+    return <ellipse cx="128" cy="166" rx="11.5" ry="8" fill={appearance.lips} />;
+  }, [isTalking, mouthFrame, expression, appearance, displayedTone]);
 
   const hairShape = useMemo(() => {
     return (
       <>
-        {/* Back/top hair mass - sits behind head, open around face */}
         <path
           d="
             M70 90
@@ -230,7 +518,6 @@ export default function AnimatedBotFace({
           fill={appearance.hair}
         />
 
-        {/* Left front section */}
         <path
           d="
             M128 54
@@ -243,7 +530,6 @@ export default function AnimatedBotFace({
           fill={appearance.hair}
         />
 
-        {/* Right front section */}
         <path
           d="
             M128 54
@@ -256,7 +542,6 @@ export default function AnimatedBotFace({
           fill={appearance.hair}
         />
 
-        {/* Center part seam */}
         <path
           d="M128 54 Q128 64 128 74"
           stroke="rgba(255,255,255,0.18)"
@@ -267,6 +552,9 @@ export default function AnimatedBotFace({
       </>
     );
   }, [appearance]);
+
+  const pupilRx = expression.pupilsNarrow ? 7.2 : 8;
+  const pupilRy = expression.pupilsNarrow ? 9.2 * expression.eyeScaleY : 10 * expression.eyeScaleY;
 
   return (
     <div
@@ -319,7 +607,6 @@ export default function AnimatedBotFace({
         <svg viewBox="0 0 256 256" style={{ width: "92%", height: "92%" }}>
           {hairShape}
 
-          {/* Head */}
           <path
             d="
               M128 58
@@ -334,7 +621,6 @@ export default function AnimatedBotFace({
             fill={appearance.skin}
           />
 
-          {/* Ears */}
           <ellipse cx="88" cy="144" rx="9" ry="13" fill={appearance.skin} />
           <ellipse cx="168" cy="144" rx="9" ry="13" fill={appearance.skin} />
 
@@ -345,48 +631,39 @@ export default function AnimatedBotFace({
             </>
           )}
 
-          {/* Brows */}
-          <path d={expression.browLeft} stroke="#4B3427" strokeWidth="4" fill="none" strokeLinecap="round" />
-          <path d={expression.browRight} stroke="#4B3427" strokeWidth="4" fill="none" strokeLinecap="round" />
+          <path d={expression.browLeft} stroke="#4B3427" strokeWidth="4.5" fill="none" strokeLinecap="round" />
+          <path d={expression.browRight} stroke="#4B3427" strokeWidth="4.5" fill="none" strokeLinecap="round" />
 
-          {/* Eyes */}
-          {!blink ? (
-            <>
-              <ellipse
-                cx="102"
-                cy="116"
-                rx="8"
-                ry={10 * expression.eyeScaleY}
-                fill={appearance.eyes}
-              />
-              <ellipse
-                cx="154"
-                cy="116"
-                rx="8"
-                ry={10 * expression.eyeScaleY}
-                fill={appearance.eyes}
-              />
-              <circle cx="104" cy="112" r="2.5" fill="#fff" />
-              <circle cx="156" cy="112" r="2.5" fill="#fff" />
-              <path d="M92 104 Q102 96 112 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <path d="M144 104 Q154 96 164 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
-              {appearance.lash && (
-                <>
-                  <path d="M95 102 L90 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M102 100 L102 95" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M109 102 L114 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M147 102 L142 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M154 100 L154 95" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M161 102 L166 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <path d="M94 116 Q102 120 110 116" stroke="#2C1E16" strokeWidth="4" fill="none" strokeLinecap="round" />
-              <path d="M146 116 Q154 120 162 116" stroke="#2C1E16" strokeWidth="4" fill="none" strokeLinecap="round" />
-            </>
-          )}
+          <>
+            <ellipse
+              cx={102 + eyeOffsetX}
+              cy={116 + eyeOffsetY}
+              rx={pupilRx}
+              ry={pupilRy}
+              fill={appearance.eyes}
+            />
+            <ellipse
+              cx={154 + eyeOffsetX}
+              cy={116 + eyeOffsetY}
+              rx={pupilRx}
+              ry={pupilRy}
+              fill={appearance.eyes}
+            />
+            <circle cx={104 + eyeOffsetX} cy={112 + eyeOffsetY} r="2.5" fill="#fff" />
+            <circle cx={156 + eyeOffsetX} cy={112 + eyeOffsetY} r="2.5" fill="#fff" />
+            <path d="M92 104 Q102 96 112 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
+            <path d="M144 104 Q154 96 164 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
+            {appearance.lash && (
+              <>
+                <path d="M95 102 L90 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+                <path d="M102 100 L102 95" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+                <path d="M109 102 L114 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+                <path d="M147 102 L142 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+                <path d="M154 100 L154 95" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+                <path d="M161 102 L166 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+              </>
+            )}
+          </>
 
           {appearance.glasses && (
             <>
@@ -396,7 +673,6 @@ export default function AnimatedBotFace({
             </>
           )}
 
-          {/* Nose */}
           <path
             d={`M128 122 Q${122 + appearance.noseShift} 145 ${129 + appearance.noseShift} 151`}
             stroke="#C48D6B"
@@ -407,7 +683,6 @@ export default function AnimatedBotFace({
 
           {appearance.mole && <circle cx="154" cy="154" r="1.8" fill="#7A4E3A" />}
 
-          {/* Mouth */}
           {mouth}
 
           {appearance.accessory === 1 && (
