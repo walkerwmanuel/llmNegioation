@@ -4,9 +4,17 @@ import TextToText from "./pages/TextToText";
 import SpeechToText from "./pages/SpeechToText";
 import VoiceToVoice from "./pages/VoiceToVoice";
 
+import { Navigate } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import LoginPage from "./pages/LoginPage";
+
 import { AuthButton } from "./components/auth/AuthButton";
 
+
 export default function App() {
+  const { isAuthenticated } = useAuth();
+  
   return (
     <Router>
       {/* GLOBAL HERO HEADER (dark) */}
@@ -65,10 +73,50 @@ export default function App() {
 
       {/* ROUTES */}
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/text-to-text" element={<TextToText />} />
-        <Route path="/speech-to-text" element={<SpeechToText />} />
-        <Route path="/voice-to-voice" element={<VoiceToVoice />} /> {/* ✅ NEW */}
+        {/* LOGIN PAGE */}
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
+          }
+        />
+
+        {/* PROTECTED ROUTES */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/text-to-text"
+          element={
+            <ProtectedRoute>
+              <TextToText />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/speech-to-text"
+          element={
+            <ProtectedRoute>
+              <SpeechToText />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/voice-to-voice"
+          element={
+            <ProtectedRoute>
+              <VoiceToVoice />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
 
     </Router>

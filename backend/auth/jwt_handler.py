@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from auth.config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_EXPIRATION_HOURS
-
+print("JWT_SECRET_KEY:", JWT_SECRET_KEY)
 
 def create_token(user_id: int, email: str) -> str:
     """Creates a JWT token for the user"""

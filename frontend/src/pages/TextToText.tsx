@@ -13,6 +13,7 @@ import DownloadChatButton from "../components/ui/DownloadChatButton";
 import { NegotiationLayout } from "../components/layout/NegotiationLayout";
 import { useNegotiationSession } from "../hooks/useNegotiationSession";
 import { useAuth } from "../context/AuthContext";
+import { API } from "../config/api";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -41,8 +42,7 @@ type ChatItem =
       messageId?: number;
     };
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8025";
-const API_URL = `${API_BASE}/t2t-negotiate`;
+    const API_URL = API.textToText.negotiate;
 
 function buildPayload({ transcript, form }: { transcript: string; form: FormState }) {
   return {
