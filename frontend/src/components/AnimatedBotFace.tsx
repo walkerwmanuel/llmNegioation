@@ -40,17 +40,7 @@ export default function AnimatedBotFace({
   tone?: FaceTone;
   isTalking?: boolean;
 }) {
-  const [blink, setBlink] = useState(false);
   const [mouthFrame, setMouthFrame] = useState(0);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setBlink(true);
-      window.setTimeout(() => setBlink(false), 140);
-    }, 2600);
-
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     if (!isTalking) {
@@ -349,44 +339,38 @@ export default function AnimatedBotFace({
           <path d={expression.browLeft} stroke="#4B3427" strokeWidth="4" fill="none" strokeLinecap="round" />
           <path d={expression.browRight} stroke="#4B3427" strokeWidth="4" fill="none" strokeLinecap="round" />
 
-          {/* Eyes */}
-          {!blink ? (
-            <>
-              <ellipse
-                cx="102"
-                cy="116"
-                rx="8"
-                ry={10 * expression.eyeScaleY}
-                fill={appearance.eyes}
-              />
-              <ellipse
-                cx="154"
-                cy="116"
-                rx="8"
-                ry={10 * expression.eyeScaleY}
-                fill={appearance.eyes}
-              />
-              <circle cx="104" cy="112" r="2.5" fill="#fff" />
-              <circle cx="156" cy="112" r="2.5" fill="#fff" />
-              <path d="M92 104 Q102 96 112 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <path d="M144 104 Q154 96 164 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
-              {appearance.lash && (
-                <>
-                  <path d="M95 102 L90 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M102 100 L102 95" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M109 102 L114 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M147 102 L142 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M154 100 L154 95" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M161 102 L166 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <path d="M94 116 Q102 120 110 116" stroke="#2C1E16" strokeWidth="4" fill="none" strokeLinecap="round" />
-              <path d="M146 116 Q154 120 162 116" stroke="#2C1E16" strokeWidth="4" fill="none" strokeLinecap="round" />
-            </>
-          )}
+         
+          {/* Eyes (no blinking) */}
+<>
+  <ellipse
+    cx="102"
+    cy="116"
+    rx="8"
+    ry={10 * expression.eyeScaleY}
+    fill={appearance.eyes}
+  />
+  <ellipse
+    cx="154"
+    cy="116"
+    rx="8"
+    ry={10 * expression.eyeScaleY}
+    fill={appearance.eyes}
+  />
+  <circle cx="104" cy="112" r="2.5" fill="#fff" />
+  <circle cx="156" cy="112" r="2.5" fill="#fff" />
+  <path d="M92 104 Q102 96 112 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
+  <path d="M144 104 Q154 96 164 104" stroke="#2C1E16" strokeWidth="2" fill="none" strokeLinecap="round" />
+  {appearance.lash && (
+    <>
+      <path d="M95 102 L90 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+      <path d="M102 100 L102 95" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+      <path d="M109 102 L114 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+      <path d="M147 102 L142 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+      <path d="M154 100 L154 95" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+      <path d="M161 102 L166 98" stroke="#2C1E16" strokeWidth="2" strokeLinecap="round" />
+    </>
+  )}
+</>
 
           {appearance.glasses && (
             <>
