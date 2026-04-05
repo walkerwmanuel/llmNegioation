@@ -10,6 +10,7 @@ from routes.negotiation_routes import router as negotiation_router
 from routes.message_routes import router as message_router
 from routes.realtime import router as realtime_router
 from database.db import init_db
+from routes.emotion_routes import router as emotion_router
 
 
 @asynccontextmanager
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(emotion_router)
 
 # Allow frontend origins for CORS
 origins = [

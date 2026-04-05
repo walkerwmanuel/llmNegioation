@@ -13,7 +13,7 @@ import DownloadChatButton from "../components/ui/DownloadChatButton";
 import { NegotiationLayout } from "../components/layout/NegotiationLayout";
 import { useNegotiationSession } from "../hooks/useNegotiationSession";
 import { useAuth } from "../context/AuthContext";
-import AnimatedBotFace, { faceToneFromText, type FaceTone } from "../components/AnimatedBotFace";
+import AnimatedBotFace, { normalizeEmotion, type FaceTone } from "../components/AnimatedBotFace";
 
 type Agent = { name: string; persona: string; stance: string };
 
@@ -194,6 +194,7 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
   const TRANSCRIBE_URL = "http://localhost:8000/speech-to-text/transcribe";
   const RESPOND_URL = "http://localhost:8000/speech-to-text/respond";
   const SETTINGS_URL = "http://localhost:8000/speech-to-text/update-settings";
+  const EMOTION_URL = "http://localhost:8000/emotion/detect";
 
   const speakText = (text: string) => {
     try {
@@ -214,6 +215,31 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
       // ignore
     }
   };
+
+  async function detectEmotionWithLLM(args: {
+    userText: string;
+    botText: string;
+    history: { speaker: string; content: string }[];
+  }): Promise<FaceTone> {
+    try {
+      const res = await fetch(EMOTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_text: args.userText,
+          bot_text: args.botText,
+          history: args.history,
+        }),
+      });
+  
+      if (!res.ok) return "neutral";
+  
+      const data = await res.json();
+      return normalizeEmotion(data.emotion);
+    } catch {
+      return "neutral";
+    }
+  }
 
   const stopSpeaking = () => {
     try {
@@ -267,7 +293,7 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
         content: m.content,
         side: m.role === "user" ? ("left" as const) : ("right" as const),
         animateWords: false,
-        tone: m.role === "user" ? undefined : faceToneFromText(m.content),
+        tone: m.role === "user" ? undefined : "neutral",
       }));
   
       setMessages(loadedMessages);
@@ -527,7 +553,16 @@ async function startRecording() {
         if (!data?.bot) throw new Error("Unexpected response from server");
   
         const botText = String(data.bot);
-        const botTone = faceToneFromText(botText, cleaned);
+        const history = prefix.map((msg) => ({
+          speaker: msg.speaker,
+          content: msg.content,
+        }));
+        
+        const botTone = await detectEmotionWithLLM({
+          userText: cleaned,
+          botText,
+          history,
+        });
   
         setLastUserText(cleaned);
         setBotFaceTone(botTone);
@@ -559,25 +594,25 @@ async function startRecording() {
       setSendingToBot(true);
   
       const cleaned = transcript.trim();
-      if (!cleaned) throw new Error("Transcript is empty. Please type something before sending.");
+      if (!cleaned) throw new Error("Transcript is empty.");
   
       const f = formRef.current;
   
-      // Build history
-      const history = messages.map(msg => ({
+      // ✅ correct history
+      const history = messages.map((msg) => ({
         speaker: msg.speaker,
-        content: msg.content
+        content: msg.content,
       }));
-  
-      const payload = {
-        text: cleaned,
-        history: history
-      };
   
       const res = await fetch(TEXT_TURN_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: cleaned,
+          history,
+        }),
       });
   
       if (!res.ok) {
@@ -586,36 +621,24 @@ async function startRecording() {
       }
   
       const data = await res.json();
+  
       if (data?.error) throw new Error(data.error);
-      if (!data?.you_text || !data?.bot_text) throw new Error("Unexpected response from server");
+      if (!data?.you_text || !data?.bot_text)
+        throw new Error("Bad response");
   
       const userText = String(data.you_text);
       const botText = String(data.bot_text);
   
-      // 🔥 AVATAR LOGIC
-      const botTone = faceToneFromText(botText, cleaned); // or (botText) if your fn only takes one arg
+      // ✅ NOW call emotion AFTER botText exists
+      const botTone = await detectEmotionWithLLM({
+        userText: cleaned,
+        botText,
+        history,
+      });
+  
       setLastUserText(cleaned);
       setBotFaceTone(botTone);
   
-      // Update prompt inspector (unchanged)
-      if (data.actual_system_prompt) {
-        setSystemPrompt(data.actual_system_prompt);
-        
-        const conversationDisplay = [
-          "=== SYSTEM PROMPT ===",
-          data.actual_system_prompt,
-          "",
-          "=== CONVERSATION HISTORY ===",
-          ...history.map(msg => `${msg.speaker}: ${msg.content}`),
-          "",
-          "=== CURRENT MESSAGE ===",
-          `You: ${cleaned}`
-        ].join('\n');
-        
-        setLastPromptSent(conversationDisplay);
-      }
-  
-      // Add to chat history (WITH avatar props)
       setMessages((prev) => [
         ...prev,
         { speaker: "You", content: userText, side: "left" },
@@ -628,48 +651,36 @@ async function startRecording() {
         },
       ]);
   
-      // 🔥 WORD-BY-WORD ANIMATION
       await animateBotReply(botText);
   
-      // 🔊 TTS (unchanged, but now synced with avatar)
+      // TTS stays the same
       if (data.bot_audio_base64 && ttsEnabled) {
         const audioBlob = new Blob(
           [Uint8Array.from(atob(data.bot_audio_base64), c => c.charCodeAt(0))],
           { type: data.bot_audio_mime || "audio/mpeg" }
         );
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        
+  
+        const url = URL.createObjectURL(audioBlob);
+        const audio = new Audio(url);
+  
         audio.onplay = () => setSpeaking(true);
         audio.onended = () => {
           setSpeaking(false);
-          URL.revokeObjectURL(audioUrl);
+          URL.revokeObjectURL(url);
         };
         audio.onerror = () => {
           setSpeaking(false);
-          URL.revokeObjectURL(audioUrl);
+          URL.revokeObjectURL(url);
         };
-        
-        audio.play().catch(() => setSpeaking(false));
-      }
   
-      // Save messages if authenticated (unchanged)
-      if (isAuthenticated) {
-        let negId = currentNegotiationId;
-        if (!negId) {
-          negId = await startNewNegotiation(f.topic, "voice_to_voice");
-        }
-        if (negId) {
-          await saveMessage("user", userText, negId);
-          await saveMessage("ai_1", botText, negId);
-        }
+        audio.play().catch(() => setSpeaking(false));
       }
   
       setTranscript("");
       setHasTranscript(false);
   
     } catch (e: any) {
-      setError(e.message || "Failed to send transcript to bot");
+      setError(e.message || "Failed");
     } finally {
       setSendingToBot(false);
     }

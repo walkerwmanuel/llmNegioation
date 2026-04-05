@@ -13,7 +13,7 @@ import DownloadChatButton from "../components/ui/DownloadChatButton";
 import { NegotiationLayout } from "../components/layout/NegotiationLayout";
 import { useNegotiationSession } from "../hooks/useNegotiationSession";
 import { useAuth } from "../context/AuthContext";
-import AnimatedBotFace, { faceToneFromText, type FaceTone } from "../components/AnimatedBotFace";
+import AnimatedBotFace, { normalizeEmotion, type FaceTone } from "../components/AnimatedBotFace";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -148,6 +148,7 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
   const TRANSCRIBE_URL = "http://localhost:8000/speech-to-text/transcribe";
   const RESPOND_URL = "http://localhost:8000/speech-to-text/respond";
   const SETTINGS_URL = "http://localhost:8000/speech-to-text/update-settings";
+  const EMOTION_URL = "http://localhost:8000/emotion/detect";
 
   // Negotiation session hook for persistence
   const { isAuthenticated } = useAuth();
@@ -177,7 +178,7 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
         content: m.content,
         side: m.role === "user" ? "left" as const : "right" as const,
         animateWords: false,
-        tone: m.role === "user" ? undefined : faceToneFromText(m.content),
+        tone: m.role === "user" ? undefined : "neutral",
       }));
       setMessages(loadedMessages);
       setPendingLoadId(null);
@@ -450,17 +451,19 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
       setDraft("");
   
       if (item.speaker === "You") {
-        const history = prefix.slice(0, -1).map(msg => ({
+        const cleaned = draft.trim();
+  
+        const history = prefix.slice(0, -1).map((msg) => ({
           speaker: msg.speaker,
-          content: msg.content
+          content: msg.content,
         }));
-
+  
         await syncSettingsToBackend();
   
         const res = await fetch(RESPOND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: draft.trim(), history: history }),
+          body: JSON.stringify({ text: cleaned, history }),
         });
   
         if (!res.ok) {
@@ -471,21 +474,32 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
         const data = await res.json();
         console.log("Respond response:", data);
   
-        const botTone = faceToneFromText(data.bot);
+        if (!data?.bot) {
+          throw new Error("Unexpected response from server");
+        }
+  
+        const botText = String(data.bot);
+  
+        const botTone = await detectEmotionWithLLM({
+          userText: cleaned,
+          botText,
+          history,
+        });
+  
         setBotFaceTone(botTone);
   
         setMessages((prev) => [
           ...prev,
           {
             speaker: form.agent2.name,
-            content: data.bot,
+            content: botText,
             side: "right",
             animateWords: true,
             tone: botTone,
           },
         ]);
   
-        await animateBotReply(data.bot);
+        await animateBotReply(botText);
       }
     } catch (err: any) {
       console.error("Error saving edit:", err);
@@ -517,31 +531,21 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
       setSendingToBot(true);
   
       const cleaned = transcript.trim();
-      if (!cleaned) {
-        throw new Error("Transcript is empty. Please type something before sending.");
-      }
+      if (!cleaned) throw new Error("Transcript is empty.");
   
       await syncSettingsToBackend();
   
-      const currentSystemPrompt = `You are ${form.agent2.name}.
-  
-  ${form.agent2.persona}
-  
-  Your goal: ${form.agent2.stance}
-  
-  Topic of conversation: ${form.topic}
-  
-  ${form.rules}
-  
-  Respond to the users message following these guidelines.`;
-  
-      setSystemPrompt(currentSystemPrompt);
-      setLastPromptSent(`User message: ${cleaned}`);
+      const history = messages.map((msg) => ({
+        speaker: msg.speaker,
+        content: msg.content,
+      }));
   
       const res = await fetch(RESPOND_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: cleaned }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: cleaned, history }),
       });
   
       if (!res.ok) {
@@ -550,28 +554,35 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
       }
   
       const data = await res.json();
-      console.log("Respond response:", data);
   
       if (!data.you || !data.bot) {
-        throw new Error("Unexpected response from server");
+        throw new Error("Bad response");
       }
   
-      const botTone = faceToneFromText(data.bot);
+      const userText = data.you;
+      const botText = data.bot;
+  
+      const botTone = await detectEmotionWithLLM({
+        userText: cleaned,
+        botText,
+        history,
+      });
+  
       setBotFaceTone(botTone);
   
       setMessages((prev) => [
         ...prev,
-        { speaker: "You", content: data.you, side: "left" },
+        { speaker: "You", content: userText, side: "left" },
         {
           speaker: form.agent2.name,
-          content: data.bot,
+          content: botText,
           side: "right",
           animateWords: true,
           tone: botTone,
         },
       ]);
   
-      await animateBotReply(data.bot);
+      await animateBotReply(botText);
   
       if (isAuthenticated) {
         let negId = currentNegotiationId;
@@ -581,8 +592,8 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
         }
   
         if (negId) {
-          await saveMessage("user", data.you, negId);
-          await saveMessage("ai_1", data.bot, negId);
+          await saveMessage("user", userText, negId);
+          await saveMessage("ai_1", botText, negId);
         }
       }
   
@@ -954,11 +965,14 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
   </div>
 
   <div style={{ position: "sticky", top: 0 }}>
-    <AnimatedBotFace
-      name={form.agent2.name}
-      tone={botFaceTone}
-      isTalking={botIsTalking}
-    />
+  <AnimatedBotFace
+  name={form.agent2.name}
+  tone={botFaceTone}
+  isTalking={botIsTalking}
+  botText={messages.filter((m) => m.side === "right").at(-1)?.content || ""}
+  liveText={displayedBotText}
+  userText={messages.filter((m) => m.side === "left").at(-1)?.content || ""}
+/>
   </div>
 </CardContent>
         </Card>

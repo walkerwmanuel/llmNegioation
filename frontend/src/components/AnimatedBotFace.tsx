@@ -1,53 +1,31 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { colors } from "./ui/colors";
 
-export type FaceTone =
+  export type FaceTone =
   | "neutral"
   | "friendly"
   | "firm"
   | "thinking"
   | "concerned"
   | "angry"
-  | "skeptical";
+  | "sad"
+  | "surprised";
 
 function countMatches(text: string, pattern: RegExp) {
   return (text.match(pattern) || []).length;
 }
 
-function scoreTone(text: string) {
-  const t = (text || "").toLowerCase();
+export function normalizeEmotion(value?: string): FaceTone {
+  const v = (value || "").trim().toLowerCase();
 
-  const friendly = countMatches(
-    t,
-    /\b(thank|thanks|glad|appreciate|happy|great|excellent|fair|together|understand|good|pleased|welcome|love|helpful|awesome|sure|absolutely)\b/g
-  );
-
-  const firm = countMatches(
-    t,
-    /\b(must|need to|needs to|require|required|won't|will not|cannot|can't|firm|final|nonnegotiable|confident|clearly|definitely|policy|deadline|expect|necessary|important|should|have to|value|price|market|maintained|reliability|performance|serious|stand by|justify)\b/g
-  );
-
-  const thinking = countMatches(
-    t,
-    /\b(maybe|perhaps|consider|could|might|option|what if|possibly|probably|explore|alternative|suggest|wonder|depends)\b/g
-  );
-
-  const concerned = countMatches(
-    t,
-    /\b(concern|concerned|risk|worry|worried|issue|problem|difficult|unfortunately|unsafe|danger|delay|blocked|blocking|stuck|uncertain|hard|trouble|conflict|fail|failure|wrong|error|lowball|cheap)\b/g
-  );
-
-  const angry = countMatches(
-    t,
-    /\b(ugly|stupid|dumb|ridiculous|insult|insulting|rude|harsh|attack|offensive|absurd|nonsense|terrible|awful|pathetic|annoying|mad|angry|furious|disrespectful|joke|crazy|wildly low|egregious|low offer|lowball)\b/g
-  );
-
-  const skeptical = countMatches(
-    t,
-    /\b(really|actually|seriously|supposedly|apparently|claim|claims|doubt|questionable|not sure|skeptical|unclear|unlikely|hard to believe)\b/g
-  );
-
-  return { friendly, firm, thinking, concerned, angry, skeptical };
+  if (v === "friendly") return "friendly";
+  if (v === "firm") return "firm";
+  if (v === "thinking") return "thinking";
+  if (v === "concerned") return "concerned";
+  if (v === "angry") return "angry";
+  if (v === "sad") return "sad";
+  if (v === "surprised") return "surprised";
+  return "neutral";
 }
 
 function hashString(str: string) {
