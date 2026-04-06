@@ -6,6 +6,7 @@ export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   if (!user) return null;
 
@@ -14,6 +15,7 @@ export function UserMenu() {
   };
 
   const isActive = isHovered || isFocused;
+  const showAvatar = user.avatar_url && !avatarError;
 
   return (
     <div style={{ position: 'relative', zIndex: 9999 }}>
@@ -30,32 +32,35 @@ export function UserMenu() {
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          padding: '4px 8px',
-          border: '1px solid #ddd',
+          padding: '4px 10px 4px 4px',
+          border: '1px solid rgba(255,255,255,0.15)',
           borderRadius: '20px',
-          background: 'white',
+          background: isActive ? '#161b36' : '#0f1328',
           cursor: 'pointer',
-          // Animation properties
+          color: '#e8edf9',
           transform: isActive ? 'scale(1.02)' : 'scale(1)',
           boxShadow: isActive
-            ? '0 4px 12px rgba(0, 0, 0, 0.2)'
-            : '0 1px 4px rgba(0, 0, 0, 0.1)',
-          transition: 'transform 150ms ease, box-shadow 150ms ease, outline 150ms ease',
-          // Focus ring for accessibility - blue
+            ? '0 4px 12px rgba(0,0,0,0.4)'
+            : '0 1px 4px rgba(0,0,0,0.25)',
+          transition: 'transform 150ms ease, box-shadow 150ms ease, background 150ms ease, outline 150ms ease',
           outline: isFocused
-            ? '3px solid rgba(26, 86, 219, 0.5)'
+            ? '3px solid rgba(204,0,0,0.5)'
             : 'none',
           outlineOffset: '2px',
         }}
       >
-        {user.avatar_url ? (
+        {showAvatar ? (
           <img
             src={user.avatar_url}
             alt={user.name}
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
+            onError={() => setAvatarError(true)}
             style={{
               width: '32px',
               height: '32px',
               borderRadius: '50%',
+              flexShrink: 0,
             }}
           />
         ) : (
@@ -64,18 +69,19 @@ export function UserMenu() {
               width: '32px',
               height: '32px',
               borderRadius: '50%',
-              background: '#4285f4',
+              background: '#CC0000',
               color: 'white',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 'bold',
+              flexShrink: 0,
             }}
           >
             {getInitial()}
           </div>
         )}
-        <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#e8edf9' }}>
           {user.name || user.email}
         </span>
       </button>
@@ -88,18 +94,35 @@ export function UserMenu() {
             position: 'absolute',
             top: '100%',
             right: 0,
-            marginTop: '4px',
-            background: 'white',
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            minWidth: '180px',
+            marginTop: '6px',
+            background: '#0f1328',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '10px',
+            boxShadow: '0 8px 25px rgba(0,0,0,0.45)',
+            minWidth: '200px',
             zIndex: 10000,
+            overflow: 'hidden',
           }}
         >
-          <div style={{ padding: '12px', borderBottom: '1px solid #eee' }}>
-            <div style={{ fontWeight: 'bold', color: '#333' }}>{user.name}</div>
-            <div style={{ fontSize: '12px', color: '#666' }}>{user.email}</div>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {showAvatar ? (
+              <img
+                src={user.avatar_url}
+                alt={user.name}
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
+                onError={() => setAvatarError(true)}
+                style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0 }}
+              />
+            ) : (
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#CC0000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>
+                {getInitial()}
+              </div>
+            )}
+            <div>
+              <div style={{ fontWeight: 700, color: '#e8edf9', fontSize: '14px' }}>{user.name}</div>
+              <div style={{ fontSize: '12px', color: '#a7b0c6' }}>{user.email}</div>
+            </div>
           </div>
           <button
             role="menuitem"
@@ -107,26 +130,19 @@ export function UserMenu() {
               logout();
               setIsOpen(false);
             }}
-            onFocus={(e) => {
-              e.currentTarget.style.background = '#f5f5f5';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.background = 'none';
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f5f5f5';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'none';
-            }}
+            onFocus={(e) => { e.currentTarget.style.background = '#161b36'; }}
+            onBlur={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#161b36'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             style={{
               width: '100%',
-              padding: '12px',
+              padding: '12px 14px',
               border: 'none',
-              background: 'none',
+              background: 'transparent',
               cursor: 'pointer',
               textAlign: 'left',
-              color: '#333',
+              color: '#e8edf9',
+              fontSize: '14px',
               transition: 'background 150ms ease',
             }}
           >
