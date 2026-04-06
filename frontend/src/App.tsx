@@ -45,25 +45,29 @@ export default function App() {
           }}
         >
           {/* Bold Overview link on left */}
-          <Link
-            to="/"
-            style={{
-              fontWeight: 700,
-              fontSize: "1rem",
-              color: "#fff",
-              textDecoration: "none",
-            }}
-          >
-            Home
-          </Link>
+          <div style={{ flex: 1, display: "flex", justifyContent: "flex-start" }}>
+            <Link
+              to="/"
+              style={{
+                fontWeight: 700,
+                fontSize: "1rem",
+                color: "#fff",
+                textDecoration: "none",
+              }}
+            >
+              Home
+            </Link>
+          </div>
 
           {/* Title centered */}
-          <h1 style={{ margin: 0, fontSize: "1.6rem", fontWeight: 800, flex: 1, textAlign: "center" }}>
+          <h1 style={{ margin: 0, fontSize: "1.6rem", fontWeight: 800, textAlign: "center", flexShrink: 0 }}>
             Cross-Cultural Negotiation System
           </h1>
 
           {/* Auth button in top-right */}
-          <AuthButton />
+          <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
+            <AuthButton />
+          </div>
         </div>
 
         <p style={{ margin: 0, fontSize: "1rem", opacity: 0.9 }}>

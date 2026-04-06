@@ -11,8 +11,8 @@ export function AuthButton() {
         style={{
           width: '24px',
           height: '24px',
-          border: '2px solid #f3f3f3',
-          borderTop: '2px solid #4285f4',
+          border: '2px solid rgba(255,255,255,0.15)',
+          borderTop: '2px solid #CC0000',
           borderRadius: '50%',
           animation: 'spin 1s linear infinite',
         }}
