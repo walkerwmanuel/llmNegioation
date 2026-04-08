@@ -13,8 +13,7 @@ import DownloadChatButton from "../components/ui/DownloadChatButton";
 import { NegotiationLayout } from "../components/layout/NegotiationLayout";
 import { useNegotiationSession } from "../hooks/useNegotiationSession";
 import { useAuth } from "../context/AuthContext";
-import AnimatedBotFace, { type FaceTone } from "../components/AnimatedBotFace";
-import { API } from "../config/api";
+import AnimatedBotFace, { faceToneFromText, type FaceTone } from "../components/AnimatedBotFace";
 
 type Agent = { name: string; persona: string; stance: string };
 type FormState = {
@@ -145,10 +144,10 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
   const maxTimeoutRef = useRef<number | null>(null);
   const [sendingToBot, setSendingToBot] = useState(false);
 
-const TRANSCRIBE_URL = API.speechToText.transcribe;
-const RESPOND_URL = API.speechToText.respond;
-const SETTINGS_URL = API.speechToText.updateSettings;
-const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/detect");
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const TRANSCRIBE_URL = "http://localhost:8025/speech-to-text/transcribe";
+  const RESPOND_URL = "http://localhost:8025/speech-to-text/respond";
+  const SETTINGS_URL = "http://localhost:8025/speech-to-text/update-settings";
 
   // Negotiation session hook for persistence
   const { isAuthenticated } = useAuth();
@@ -432,35 +431,6 @@ const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/
     }
   }
 
-  async function detectBotTone(
-    userText: string,
-    botText: string,
-    history: { speaker: string; content: string }[] = []
-  ): Promise<FaceTone> {
-    try {
-      const res = await fetch(EMOTION_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_text: userText,
-          bot_text: botText,
-          history,
-        }),
-      });
-  
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Emotion detect failed (${res.status}): ${errorText}`);
-      }
-  
-      const data = await res.json();
-      return (data.emotion as FaceTone) || "neutral";
-    } catch (err) {
-      console.error("Emotion detection failed:", err);
-      return "neutral";
-    }
-  }
-
   const onSaveEdit = async () => {
     if (editingIndex === null) return;
   
@@ -484,13 +454,13 @@ const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/
           speaker: msg.speaker,
           content: msg.content
         }));
-  
+
         await syncSettingsToBackend();
   
         const res = await fetch(RESPOND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: draft.trim(), history }),
+          body: JSON.stringify({ text: draft.trim(), history: history }),
         });
   
         if (!res.ok) {
@@ -501,7 +471,7 @@ const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/
         const data = await res.json();
         console.log("Respond response:", data);
   
-        const botTone = await detectBotTone(draft.trim(), data.bot, history);
+        const botTone = faceToneFromText(data.bot);
         setBotFaceTone(botTone);
   
         setMessages((prev) => [
@@ -586,12 +556,7 @@ const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/
         throw new Error("Unexpected response from server");
       }
   
-      const history = messages.map((msg) => ({
-        speaker: msg.speaker,
-        content: msg.content,
-      }));
-      
-      const botTone = await detectBotTone(data.you, data.bot, history);
+      const botTone = faceToneFromText(data.bot);
       setBotFaceTone(botTone);
   
       setMessages((prev) => [
@@ -742,7 +707,7 @@ const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) 320px",
     gap: 16,
-    overflow: "visible",
+    overflow: "hidden",
     alignItems: "start",
   }}
 >
@@ -988,14 +953,7 @@ const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/
     )}
   </div>
 
-  <div
-  style={{
-    position: "sticky",
-    top: 20,
-    alignSelf: "start",
-    height: "fit-content",
-  }}
->
+  <div style={{ position: "sticky", top: 0 }}>
     <AnimatedBotFace
       name={form.agent2.name}
       tone={botFaceTone}
@@ -1067,23 +1025,18 @@ const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/
                 color: colors.text,
               }}
             >
-              {/* OpenAI */}
-              <option value="gpt-4o-mini">gpt-4o-mini</option>
-              <option value="gpt-4o">gpt-4o</option>
-              <option value="gpt-5-mini">gpt-5-mini</option>
-              <option value="gpt-5.2">gpt-5.2</option>
-
-              {/* DeepSeek */}
-              <option value="deepseek-chat">deepseek-chat</option>
-
-              {/* Grok (use the exact IDs your backend supports) */}
-              <option value="grok-4-1-fast-non-reasoning">grok-4-1-fast-non-reasoning</option>
-              <option value="grok-4-1-fast-reasoning">grok-4-1-fast-reasoning</option>
-
-              {/* Gemini */}
-              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
-              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-              <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4o-mini">GPT-4o mini</option>
+              <option value="gpt-5.2">GPT-5.4</option>
+              <option value="gpt-5-mini">GPT-5.4 mini</option>
+              <option value="gpt-5-nano">GPT-5.4 nano</option>
+              <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+              <option value="gemini-3.1-flash-preview">Gemini 3.1 Flash</option>
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+              <option value="grok-4-1-fast-reasoning">Grok 4.1 Fast (Reasoning)</option>
+              <option value="grok-4-1-fast-non-reasoning">Grok 4.1 Fast (Non-Reasoning)</option>
+              <option value="deepseek-reasoner">DeepSeek-V3.2 (Thinking Mode)</option>
+              <option value="deepseek-chat">DeepSeek-V3.2 (Non-thinking Mode)</option>
             </select>
           </div>
 
