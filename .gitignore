@@ -5,6 +5,7 @@ dist/
 frontend/dist/
 
 # Python
+venv/
 .venv/
 backend/venv/
 __pycache__/

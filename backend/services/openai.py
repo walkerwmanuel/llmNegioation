@@ -29,7 +29,7 @@ grok_client = OpenAI(api_key=xai_key, base_url="https://api.x.ai/v1")
 
 def get_openai_response(model: str, prompt: str) -> str:
     # DeepSeek
-    if model == "deepseek-chat":
+    if model.startswith("deepseek"):
         response = deepseek_client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],

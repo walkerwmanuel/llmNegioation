@@ -13,6 +13,7 @@ import DownloadChatButton from "../components/ui/DownloadChatButton";
 import { NegotiationLayout } from "../components/layout/NegotiationLayout";
 import { useNegotiationSession } from "../hooks/useNegotiationSession";
 import { useAuth } from "../context/AuthContext";
+import AnimatedBotFace, { type FaceTone } from "../components/AnimatedBotFace";
 import { API } from "../config/api";
 
 type Agent = { name: string; persona: string; stance: string };
@@ -21,7 +22,9 @@ type FormState = {
   model: string;
   topic: string;
   rules: string;
-  agent2: Agent; // BOT
+  rounds: number;
+  agent1: Agent;
+  agent2: Agent;
 };
 
 type ChatItem = {
@@ -29,6 +32,8 @@ type ChatItem = {
   content: string;
   side: "left" | "right";
   prevContent?: string;
+  animateWords?: boolean;
+  tone?: FaceTone;
 };
 
 const spinnerKeyframes = `
@@ -124,6 +129,11 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
 
   const [settingsInitialized, setSettingsInitialized] = useState(false);
 
+  const [displayedBotText, setDisplayedBotText] = useState("");
+  const [botIsTalking, setBotIsTalking] = useState(false);
+  const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
+  const [lastUserText, setLastUserText] = useState("");
+
   // Initialize settings on mount
   useEffect(() => {
     const initializeSettings = async () => {
@@ -136,6 +146,26 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
     };
     initializeSettings();
   }, []);
+
+
+  async function animateBotReply(fullText: string): Promise<void> {
+    const words = fullText.split(/\s+/).filter(Boolean);
+    let current = "";
+  
+    setDisplayedBotText("");
+    setBotIsTalking(true);
+  
+    try {
+      for (let i = 0; i < words.length; i++) {
+        current = current ? `${current} ${words[i]}` : words[i];
+        setDisplayedBotText(current);
+  
+        await new Promise((resolve) => setTimeout(resolve, 90));
+      }
+    } finally {
+      setBotIsTalking(false);
+    }
+  }
 
   // Keep latest form for callbacks without dependency churn
   const formRef = useRef<FormState>(form);
@@ -160,11 +190,53 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
   const [pendingLoadId, setPendingLoadId] = useState<number | null>(null);
 
   // API endpoints
-
-const TEXT_TURN_URL = API.voiceToVoice.textTurn;
+  const TEXT_TURN_URL = API.voiceToVoice.textTurn;
 const TRANSCRIBE_URL = API.speechToText.transcribe;
 const RESPOND_URL = API.speechToText.respond;
 const SETTINGS_URL = API.speechToText.updateSettings;
+const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/detect");
+
+const ALLOWED_FACE_TONES: FaceTone[] = [
+  "neutral",
+  "friendly",
+  "firm",
+  "thinking",
+  "concerned",
+  "angry",
+  "sad",
+  "surprised",
+];
+
+async function detectEmotionTone(
+  userText: string,
+  botText: string,
+  history: { speaker: string; content: string }[]
+): Promise<FaceTone> {
+  if (!botText.trim()) return "neutral";
+
+  try {
+    const res = await fetch(EMOTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_text: userText,
+        bot_text: botText,
+        history,
+      }),
+    });
+
+    if (!res.ok) return "neutral";
+
+    const data = await res.json();
+    const emotion = String(data?.emotion ?? "neutral").toLowerCase();
+
+    return ALLOWED_FACE_TONES.includes(emotion as FaceTone)
+      ? (emotion as FaceTone)
+      : "neutral";
+  } catch {
+    return "neutral";
+  }
+}
 
   const speakText = (text: string) => {
     try {
@@ -228,18 +300,45 @@ const SETTINGS_URL = API.speechToText.updateSettings;
   const handleSelectNegotiation = async (id: number) => {
     setPendingLoadId(id);
     clearNegotiationError();
-
+  
     const negotiation = await loadNegotiation(id);
     if (negotiation) {
       const botName = formRef.current.agent2.name;
-
+  
       const loadedMessages: ChatItem[] = (negotiation.messages || []).map((m) => ({
         speaker: m.role === "user" ? "You" : botName,
         content: m.content,
         side: m.role === "user" ? ("left" as const) : ("right" as const),
+        animateWords: false,
+        tone: m.role === "user" ? undefined : "neutral",
       }));
-
+  
       setMessages(loadedMessages);
+  
+      const lastBotMessage = [...loadedMessages].reverse().find((m) => m.side === "right");
+      const lastUserMessage = [...loadedMessages].reverse().find((m) => m.side === "left");
+  
+      setDisplayedBotText("");
+      setBotIsTalking(false);
+      setLastUserText(lastUserMessage?.content ?? "");
+  
+      if (lastBotMessage?.content) {
+        const historyForEmotion = loadedMessages.map((m) => ({
+          speaker: m.speaker,
+          content: m.content,
+        }));
+  
+        const loadedTone = await detectEmotionTone(
+          lastUserMessage?.content ?? "",
+          lastBotMessage.content,
+          historyForEmotion
+        );
+  
+        setBotFaceTone(loadedTone);
+      } else {
+        setBotFaceTone("neutral");
+      }
+  
       setPendingLoadId(null);
     }
   };
@@ -451,45 +550,82 @@ async function startRecording() {
 
   const onSaveEdit = async () => {
     if (editingIndex === null) return;
-
+  
     try {
       setError(null);
-
+  
       const updated = [...messages];
       const item = updated[editingIndex];
-
+  
       const old = item.content;
       updated[editingIndex] = { ...item, prevContent: old, content: draft };
-
+  
       const prefix = updated.slice(0, editingIndex + 1);
       setMessages(prefix);
-
+  
       setEditingIndex(null);
       setDraft("");
-
+  
       // Only re-call bot if user edited their own message
       if (item.speaker === "You") {
+        const cleaned = draft.trim();
+      
+        const emotionHistory = prefix
+          .slice(0, -1)
+          .map((msg) => ({
+            speaker: msg.speaker,
+            content: msg.content,
+          }));
+      
         const res = await fetch(RESPOND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: draft.trim() }),
+          body: JSON.stringify({ text: cleaned }),
         });
-
+      
         if (!res.ok) {
           const errorText = await res.text();
           throw new Error(`HTTP ${res.status}: ${errorText}`);
         }
-
+      
         const data = await res.json();
         if (data?.error) throw new Error(data.error);
         if (!data?.bot) throw new Error("Unexpected response from server");
-
+      
+        const botText = String(data.bot);
+      
+        setLastUserText(cleaned);
+        setBotFaceTone("neutral");
+      
         setMessages((prev) => [
           ...prev,
-          { speaker: formRef.current.agent2.name, content: String(data.bot), side: "right" },
+          {
+            speaker: formRef.current.agent2.name,
+            content: botText,
+            side: "right",
+            animateWords: true,
+            tone: "neutral",
+          },
         ]);
+      
+        const finalTone = await detectEmotionTone(cleaned, botText, emotionHistory);
+          setBotFaceTone(finalTone);
 
-        speakText(String(data.bot));
+          await animateBotReply(botText);
+      
+        setMessages((prev) => {
+          const next = [...prev];
+          const lastIndex = next.length - 1;
+          if (lastIndex >= 0 && next[lastIndex].side === "right") {
+            next[lastIndex] = {
+              ...next[lastIndex],
+              tone: finalTone,
+            };
+          }
+          return next;
+        });
+      
+        speakText(botText);
       }
     } catch (e: any) {
       setError(e.message || "Failed to save edit and get response");
@@ -498,43 +634,50 @@ async function startRecording() {
 
   async function sendTranscriptToBot() {
     if (sendingToBot) return;
-
+  
     try {
       setError(null);
       setSendingToBot(true);
-
+  
       const cleaned = transcript.trim();
       if (!cleaned) throw new Error("Transcript is empty. Please type something before sending.");
-
+  
       const f = formRef.current;
-
+  
       // Build history
       const history = messages.map(msg => ({
         speaker: msg.speaker,
         content: msg.content
       }));
-
+  
       const payload = {
         text: cleaned,
         history: history
       };
-
+  
       const res = await fetch(TEXT_TURN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
+  
       if (!res.ok) {
         const errorText = await res.text();
         throw new Error(`HTTP ${res.status}: ${errorText}`);
       }
-
+  
       const data = await res.json();
       if (data?.error) throw new Error(data.error);
       if (!data?.you_text || !data?.bot_text) throw new Error("Unexpected response from server");
-
-      // Update prompt inspector
+  
+      const userText = String(data.you_text);
+      const botText = String(data.bot_text);
+  
+      // 🔥 AVATAR LOGIC
+      setLastUserText(cleaned);
+      setBotFaceTone("neutral");
+  
+      // Update prompt inspector (unchanged)
       if (data.actual_system_prompt) {
         setSystemPrompt(data.actual_system_prompt);
         
@@ -551,15 +694,40 @@ async function startRecording() {
         
         setLastPromptSent(conversationDisplay);
       }
+  
+      // Add to chat history (WITH avatar props)
+      const emotionHistory = [...history, { speaker: "You", content: userText }];
 
-      // Add to chat history
-      setMessages((prev) => [
-        ...prev,
-        { speaker: "You", content: data.you_text, side: "left" },
-        { speaker: f.agent2.name, content: data.bot_text, side: "right" },
-      ]);
+setMessages((prev) => [
+  ...prev,
+  { speaker: "You", content: userText, side: "left" },
+  {
+    speaker: f.agent2.name,
+    content: botText,
+    side: "right",
+    animateWords: true,
+    tone: "neutral",
+  },
+]);
 
-      // Play OpenAI TTS audio
+const finalTone = await detectEmotionTone(cleaned, botText, emotionHistory);
+setBotFaceTone(finalTone);
+
+await animateBotReply(botText);
+
+setMessages((prev) => {
+  const next = [...prev];
+  const lastIndex = next.length - 1;
+  if (lastIndex >= 0 && next[lastIndex].side === "right") {
+    next[lastIndex] = {
+      ...next[lastIndex],
+      tone: finalTone,
+    };
+  }
+  return next;
+});
+  
+      // 🔊 TTS (unchanged, but now synced with avatar)
       if (data.bot_audio_base64 && ttsEnabled) {
         const audioBlob = new Blob(
           [Uint8Array.from(atob(data.bot_audio_base64), c => c.charCodeAt(0))],
@@ -580,21 +748,22 @@ async function startRecording() {
         
         audio.play().catch(() => setSpeaking(false));
       }
-
-      // Save messages if authenticated
+  
+      // Save messages if authenticated (unchanged)
       if (isAuthenticated) {
         let negId = currentNegotiationId;
         if (!negId) {
           negId = await startNewNegotiation(f.topic, "voice_to_voice");
         }
         if (negId) {
-          await saveMessage("user", data.you_text, negId);
-          await saveMessage("ai_1", data.bot_text, negId);
+          await saveMessage("user", userText, negId);
+          await saveMessage("ai_1", botText, negId);
         }
       }
-
+  
       setTranscript("");
       setHasTranscript(false);
+  
     } catch (e: any) {
       setError(e.message || "Failed to send transcript to bot");
     } finally {
@@ -719,237 +888,273 @@ async function startRecording() {
           </CardHeader>
 
           <CardContent
-            ref={chatRef}
-            style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto" }}
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-              setStickToBottom(nearBottom);
+  style={{
+    flex: 1,
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) 320px",
+    gap: 16,
+    overflow: "visible",
+    alignItems: "start",
+  }}
+>
+  <div
+    ref={chatRef}
+    style={{
+      minWidth: 0,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "auto",
+    }}
+    onScroll={(e) => {
+      const el = e.currentTarget;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      setStickToBottom(nearBottom);
+    }}
+  >
+    {err && (
+      <div
+        style={{
+          padding: 12,
+          borderRadius: 8,
+          border: "1px solid #7f1d1d",
+          background: "#1f1111",
+          color: "#fecaca",
+          marginBottom: 12,
+        }}
+      >
+        {err}
+      </div>
+    )}
+
+    {negotiationLoadError && (
+      <div
+        style={{
+          padding: 16,
+          borderRadius: 8,
+          border: "1px solid #7f1d1d",
+          background: "#1f1111",
+          color: "#fecaca",
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span>{negotiationLoadError}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRetryLoad}
+          style={{ borderColor: "#fecaca", color: "#fecaca", marginLeft: 12 }}
+        >
+          Retry
+        </Button>
+      </div>
+    )}
+
+    {isLoadingNegotiation && messages.length === 0 && (
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            style={{
+              padding: 16,
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.05)",
+              border: `1px solid ${colors.border}`,
             }}
           >
-            {err && (
-              <div
-                style={{
-                  padding: 12,
-                  borderRadius: 8,
-                  border: "1px solid #7f1d1d",
-                  background: "#1f1111",
-                  color: "#fecaca",
-                  marginBottom: 12,
-                }}
-              >
-                {err}
-              </div>
-            )}
+            <div
+              style={{
+                height: 12,
+                width: "30%",
+                background: "rgba(255,255,255,0.1)",
+                borderRadius: 4,
+                marginBottom: 10,
+                animation: "pulse 1.5s ease-in-out infinite",
+              }}
+            />
+            <div
+              style={{
+                height: 14,
+                width: "85%",
+                background: "rgba(255,255,255,0.08)",
+                borderRadius: 4,
+                marginBottom: 6,
+                animation: "pulse 1.5s ease-in-out infinite",
+              }}
+            />
+            <div
+              style={{
+                height: 14,
+                width: "70%",
+                background: "rgba(255,255,255,0.08)",
+                borderRadius: 4,
+                animation: "pulse 1.5s ease-in-out infinite",
+              }}
+            />
+          </div>
+        ))}
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+        `}</style>
+      </div>
+    )}
 
-            {/* Negotiation load error with retry */}
-            {negotiationLoadError && (
-              <div
-                style={{
-                  padding: 16,
-                  borderRadius: 8,
-                  border: "1px solid #7f1d1d",
-                  background: "#1f1111",
-                  color: "#fecaca",
-                  marginBottom: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span>{negotiationLoadError}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRetryLoad}
-                  style={{ borderColor: "#fecaca", color: "#fecaca", marginLeft: 12 }}
-                >
-                  Retry
-                </Button>
-              </div>
-            )}
+    {messages.length === 0 && !recording && !hasTranscript && !isLoadingNegotiation && (
+      <div style={{ color: colors.muted, fontSize: 14 }}>
+        Press 🎤 to record. After transcription, send it — the bot will respond and speak back.
+      </div>
+    )}
 
-            {/* Loading skeleton */}
-            {isLoadingNegotiation && messages.length === 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    style={{
-                      padding: 16,
-                      borderRadius: 12,
-                      background: "rgba(255,255,255,0.05)",
-                      border: `1px solid ${colors.border}`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: 12,
-                        width: "30%",
-                        background: "rgba(255,255,255,0.1)",
-                        borderRadius: 4,
-                        marginBottom: 10,
-                        animation: "pulse 1.5s ease-in-out infinite",
-                      }}
-                    />
-                    <div
-                      style={{
-                        height: 14,
-                        width: "85%",
-                        background: "rgba(255,255,255,0.08)",
-                        borderRadius: 4,
-                        marginBottom: 6,
-                        animation: "pulse 1.5s ease-in-out infinite",
-                      }}
-                    />
-                    <div
-                      style={{
-                        height: 14,
-                        width: "70%",
-                        background: "rgba(255,255,255,0.08)",
-                        borderRadius: 4,
-                        animation: "pulse 1.5s ease-in-out infinite",
-                      }}
-                    />
-                  </div>
-                ))}
-                <style>{`
-                  @keyframes pulse {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.5; }
-                  }
-                `}</style>
-              </div>
-            )}
+    {messages.map((m, i) => (
+      <div
+        key={i}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: m.side === "left" ? "flex-start" : "flex-end",
+        }}
+      >
+        {m.prevContent && (
+          <div
+            style={{
+              maxWidth: "70%",
+              padding: "8px 10px",
+              borderRadius: 12,
+              background: m.side === "left" ? colors.bubbleA : colors.bubbleB,
+              border: `1px solid ${colors.border}`,
+              marginBottom: 6,
+              color: colors.muted as string,
+            }}
+            title="Changes from previous version"
+          >
+            <DiffText oldText={m.prevContent} newText={m.content} />
+          </div>
+        )}
 
-            {messages.length === 0 && !recording && !hasTranscript && !isLoadingNegotiation && (
-              <div style={{ color: colors.muted, fontSize: 14 }}>
-                Press 🎤 to record. After transcription, send it — the bot will respond and speak back.
-              </div>
-            )}
+        <ChatBubble
+          name={m.speaker}
+          content={
+            editingIndex === i
+              ? draft
+              : m.side === "right" &&
+                i === messages.length - 1 &&
+                m.animateWords
+              ? displayedBotText
+              : m.content
+          }
+          side={m.side}
+          isEditing={editingIndex === i}
+          onEdit={() => {
+            setEditingIndex(i);
+            setDraft(m.content);
+            setStickToBottom(false);
+          }}
+          onChange={setDraft}
+          onCancel={() => {
+            setEditingIndex(null);
+            setDraft("");
+          }}
+          onSave={onSaveEdit}
+          editedAt={undefined}
+          originalContent={undefined}
+        />
+      </div>
+    ))}
 
-            {/* Chat messages */}
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: m.side === "left" ? "flex-start" : "flex-end",
-                }}
-              >
-                {m.prevContent && (
-                  <div
-                    style={{
-                      maxWidth: "70%",
-                      padding: "8px 10px",
-                      borderRadius: 12,
-                      background: m.side === "left" ? colors.bubbleA : colors.bubbleB,
-                      border: `1px solid ${colors.border}`,
-                      marginBottom: 6,
-                      color: colors.muted as string,
-                    }}
-                    title="Changes from previous version"
-                  >
-                    <DiffText oldText={m.prevContent} newText={m.content} />
-                  </div>
-                )}
+    {hasTranscript && (
+      <div
+        style={{
+          marginTop: 12,
+          padding: 12,
+          borderRadius: 8,
+          border: `1px solid ${colors.border}`,
+          background: colors.panelAlt,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          opacity: sendingToBot ? 0.6 : 1,
+          pointerEvents: sendingToBot ? "none" : "auto",
+        }}
+      >
+        <div style={{ fontSize: 14, color: colors.muted, marginBottom: 4 }}>
+          {sendingToBot ? <span>Sending to Bot...</span> : <span>Edit your transcript, then send.</span>}
+        </div>
 
-                <ChatBubble
-                  name={m.speaker}
-                  content={editingIndex === i ? draft : m.content}
-                  side={m.side}
-                  isEditing={editingIndex === i}
-                  onEdit={() => {
-                    setEditingIndex(i);
-                    setDraft(m.content);
-                    setStickToBottom(false);
-                  }}
-                  onChange={setDraft}
-                  onCancel={() => {
-                    setEditingIndex(null);
-                    setDraft("");
-                  }}
-                  onSave={onSaveEdit}
-                  editedAt={undefined}
-                  originalContent={undefined}
-                />
-              </div>
-            ))}
+        <Textarea
+          label="Transcript"
+          rows={4}
+          value={transcript}
+          onChange={(e) => setTranscript(e.target.value)}
+          disabled={sendingToBot}
+        />
 
-            {hasTranscript && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 12,
-                  borderRadius: 8,
-                  border: `1px solid ${colors.border}`,
-                  background: colors.panelAlt,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                  opacity: sendingToBot ? 0.6 : 1,
-                  pointerEvents: sendingToBot ? "none" : "auto",
-                }}
-              >
-                <div style={{ fontSize: 14, color: colors.muted, marginBottom: 4 }}>
-                  {sendingToBot ? <span>Sending to Bot...</span> : <span>Edit your transcript, then send.</span>}
-                </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setHasTranscript(false);
+              setTranscript("");
+            }}
+            disabled={sendingToBot}
+          >
+            Discard
+          </Button>
 
-                <Textarea
-                  label="Transcript"
-                  rows={4}
-                  value={transcript}
-                  onChange={(e) => setTranscript(e.target.value)}
-                  disabled={sendingToBot}
-                />
+          <Button size="sm" onClick={sendTranscriptToBot} disabled={sendingToBot || !transcript.trim()}>
+            {sendingToBot ? "Sending..." : "Send to Bot"}
+          </Button>
+        </div>
 
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setHasTranscript(false);
-                      setTranscript("");
-                    }}
-                    disabled={sendingToBot}
-                  >
-                    Discard
-                  </Button>
+        {sendingToBot && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              fontSize: 12,
+              color: colors.muted,
+              marginTop: 4,
+            }}
+          >
+            <div
+              style={{
+                width: 16,
+                height: 16,
+                border: `2px solid ${colors.border}`,
+                borderTopColor: colors.text,
+                borderRadius: "50%",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+            <span>Processing your message...</span>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
 
-                  <Button size="sm" onClick={sendTranscriptToBot} disabled={sendingToBot || !transcript.trim()}>
-                    {sendingToBot ? "Sending..." : "Send to Bot"}
-                  </Button>
-                </div>
-
-                {sendingToBot && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      fontSize: 12,
-                      color: colors.muted,
-                      marginTop: 4,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 16,
-                        height: 16,
-                        border: `2px solid ${colors.border}`,
-                        borderTopColor: colors.text,
-                        borderRadius: "50%",
-                        animation: "spin 0.8s linear infinite",
-                      }}
-                    />
-                    <span>Processing your message...</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
+  <div
+  style={{
+    position: "sticky",
+    top: 20,
+    alignSelf: "start",
+    height: "fit-content",
+  }}
+>
+  <AnimatedBotFace
+  name={form.agent2.name}
+  tone={botFaceTone}
+  isTalking={botIsTalking || speaking}
+/>
+  </div>
+</CardContent>
         </Card>
 
         {/* SETTINGS MODAL */}
@@ -992,17 +1197,18 @@ async function startRecording() {
                 color: colors.text,
               }}
             >
-              <option value="gpt-4o-mini">gpt-4o-mini</option>
-              <option value="gpt-4o">gpt-4o</option>
-              <option value="gpt-5-nano">gpt-5-nano</option>
-              <option value="gpt-5-mini">gpt-5-mini</option>
-              <option value="gpt-5.2">gpt-5.2</option>
-              <option value="deepseek-chat">deepseek-chat</option>
-              <option value="grok-4-1-fast-non-reasoning">grok-4-1-fast-non-reasoning</option>
-              <option value="grok-4-1-fast-reasoning">grok-4-1-fast-reasoning</option>
-              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
-              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-              <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4o-mini">GPT-4o mini</option>
+              <option value="gpt-5.2">GPT-5.4</option>
+              <option value="gpt-5-mini">GPT-5.4 mini</option>
+              <option value="gpt-5-nano">GPT-5.4 nano</option>
+              <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+              <option value="gemini-3.1-flash-preview">Gemini 3.1 Flash</option>
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+              <option value="grok-4-1-fast-reasoning">Grok 4.1 Fast (Reasoning)</option>
+              <option value="grok-4-1-fast-non-reasoning">Grok 4.1 Fast (Non-Reasoning)</option>
+              <option value="deepseek-reasoner">DeepSeek-V3.2 (Thinking Mode)</option>
+              <option value="deepseek-chat">DeepSeek-V3.2 (Non-thinking Mode)</option>
             </select>
           </div>
 
