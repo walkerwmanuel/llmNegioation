@@ -58,18 +58,28 @@ async def emotion_detect(payload: EmotionRequest):
     prompt = f"""
 You are an emotion classifier for an animated avatar.
 
-Classify the BOT's emotional expression for its latest reply.
+Your job is to determine the BOT's facial expression.
 
-Return exactly one label from this list:
+Return exactly one label:
 neutral, friendly, firm, thinking, concerned, angry, sad, surprised
 
+IMPORTANT:
+- The PRIMARY signal is the BOT's reply
+- The USER message should influence the result (emotional bias)
+
 Rules:
-- Classify the emotion the BOT should visually express.
-- Prefer firm over angry unless the bot sounds clearly irritated, hostile, or offended.
-- Prefer concerned for caution, warning, risk, uncertainty, or bad news.
-- Prefer thinking for reflective, analytical, or deliberative language.
-- Prefer friendly for warm, reassuring, cooperative language.
-- Return only the label.
+1. If the USER message is insulting, rude, hostile, or aggressive,
+   lean toward "angry" or "firm" EVEN IF the bot sounds polite.
+
+2. If the USER expresses sadness or vulnerability,
+   lean toward "concerned" or "friendly"
+
+3. If the USER expresses surprise or excitement,
+   you may lean toward "surprised"
+
+4. Otherwise, classify based mainly on the BOT tone.
+
+5. Prefer "angry" more often than before if tension exists.
 
 Conversation history:
 {history_text}
@@ -79,6 +89,8 @@ Latest user message:
 
 Latest bot reply:
 {payload.bot_text}
+
+Return ONLY the label.
 """.strip()
 
     try:
@@ -94,5 +106,6 @@ Latest bot reply:
             emotion = "neutral"
 
         return EmotionResponse(emotion=emotion)
+
     except Exception:
         return EmotionResponse(emotion="neutral")
