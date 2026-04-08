@@ -13,7 +13,7 @@ import DownloadChatButton from "../components/ui/DownloadChatButton";
 import { NegotiationLayout } from "../components/layout/NegotiationLayout";
 import { useNegotiationSession } from "../hooks/useNegotiationSession";
 import { useAuth } from "../context/AuthContext";
-import AnimatedBotFace, { faceToneFromText, type FaceTone } from "../components/AnimatedBotFace";
+import AnimatedBotFace, { type FaceTone } from "../components/AnimatedBotFace";
 import { API } from "../config/api";
 
 type Agent = { name: string; persona: string; stance: string };
@@ -148,6 +148,7 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
 const TRANSCRIBE_URL = API.speechToText.transcribe;
 const RESPOND_URL = API.speechToText.respond;
 const SETTINGS_URL = API.speechToText.updateSettings;
+const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/detect");
 
   // Negotiation session hook for persistence
   const { isAuthenticated } = useAuth();
@@ -431,6 +432,35 @@ const SETTINGS_URL = API.speechToText.updateSettings;
     }
   }
 
+  async function detectBotTone(
+    userText: string,
+    botText: string,
+    history: { speaker: string; content: string }[] = []
+  ): Promise<FaceTone> {
+    try {
+      const res = await fetch(EMOTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_text: userText,
+          bot_text: botText,
+          history,
+        }),
+      });
+  
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Emotion detect failed (${res.status}): ${errorText}`);
+      }
+  
+      const data = await res.json();
+      return (data.emotion as FaceTone) || "neutral";
+    } catch (err) {
+      console.error("Emotion detection failed:", err);
+      return "neutral";
+    }
+  }
+
   const onSaveEdit = async () => {
     if (editingIndex === null) return;
   
@@ -454,13 +484,13 @@ const SETTINGS_URL = API.speechToText.updateSettings;
           speaker: msg.speaker,
           content: msg.content
         }));
-
+  
         await syncSettingsToBackend();
   
         const res = await fetch(RESPOND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: draft.trim(), history: history }),
+          body: JSON.stringify({ text: draft.trim(), history }),
         });
   
         if (!res.ok) {
@@ -471,7 +501,7 @@ const SETTINGS_URL = API.speechToText.updateSettings;
         const data = await res.json();
         console.log("Respond response:", data);
   
-        const botTone = faceToneFromText(data.bot);
+        const botTone = await detectBotTone(draft.trim(), data.bot, history);
         setBotFaceTone(botTone);
   
         setMessages((prev) => [
@@ -556,7 +586,12 @@ const SETTINGS_URL = API.speechToText.updateSettings;
         throw new Error("Unexpected response from server");
       }
   
-      const botTone = faceToneFromText(data.bot);
+      const history = messages.map((msg) => ({
+        speaker: msg.speaker,
+        content: msg.content,
+      }));
+      
+      const botTone = await detectBotTone(data.you, data.bot, history);
       setBotFaceTone(botTone);
   
       setMessages((prev) => [
