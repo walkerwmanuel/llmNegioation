@@ -893,7 +893,7 @@ setMessages((prev) => {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) 320px",
     gap: 16,
-    overflow: "hidden",
+    overflow: "visible",
     alignItems: "start",
   }}
 >
@@ -1140,7 +1140,14 @@ setMessages((prev) => {
     )}
   </div>
 
-  <div style={{ position: "sticky", top: 0 }}>
+  <div
+  style={{
+    position: "sticky",
+    top: 20,
+    alignSelf: "start",
+    height: "fit-content",
+  }}
+>
   <AnimatedBotFace
   name={form.agent2.name}
   tone={botFaceTone}
