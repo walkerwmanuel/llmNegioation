@@ -55,40 +55,71 @@ async def emotion_detect(payload: EmotionRequest):
         f"{msg.speaker}: {msg.content}" for msg in payload.history[-12:]
     )
 
+    user_text = (payload.user_text or "").lower()
+    user_text_raw = payload.user_text or ""
+    bot_text_raw = payload.bot_text or ""
+
+    firm_user_markers = [
+        "non negotiable",
+        "non-negotiable",
+        "final offer",
+        "take it or leave it",
+        "not going higher",
+        "this is my price",
+        "won't pay more",
+        "will not pay more",
+    ]
+
+    rude_user_markers = [
+        "ugly",
+        "stupid",
+        "idiot",
+        "dumb",
+        "trash",
+        "awful",
+        "hate",
+    ]
+
+    if any(word in user_text for word in rude_user_markers):
+        return EmotionResponse(emotion="angry")
+
+    if any(word in user_text for word in firm_user_markers):
+        return EmotionResponse(emotion="firm")
+
     prompt = f"""
 You are an emotion classifier for an animated avatar.
 
-Your job is to determine the BOT's facial expression.
+Your job is to classify the emotional tone of the CURRENT CONVERSATION EXCHANGE
+and choose what face the bot should show in response.
 
-Return exactly one label:
+Return exactly one label from:
 neutral, friendly, firm, thinking, concerned, angry, sad, surprised
 
 IMPORTANT:
-- The PRIMARY signal is the BOT's reply
-- The USER message should influence the result (emotional bias)
+- The USER's message is the primary driver of the emotion.
+- The BOT's reply is secondary context.
+- Classify the emotional atmosphere of the exchange, not just the bot's wording.
+- The bot may still show firm, concerned, surprised, or angry even if its actual wording is polite.
+- Return only the label, with no punctuation or explanation.
 
-Rules:
-1. If the USER message is insulting, rude, hostile, or aggressive,
-   lean toward "angry" or "firm" EVEN IF the bot sounds polite.
-
-2. If the USER expresses sadness or vulnerability,
-   lean toward "concerned" or "friendly"
-
-3. If the USER expresses surprise or excitement,
-   you may lean toward "surprised"
-
-4. Otherwise, classify based mainly on the BOT tone.
-
-5. Prefer "angry" more often than before if tension exists.
+Guidelines:
+- Use angry when the user is insulting, hostile, mocking, aggressive, or disrespectful.
+- Use firm when the user is pushy, dismissive, demanding, or making rigid ultimatums.
+- Use concerned when the user expresses worry, risk, uncertainty, fear, or bad news.
+- Use sad when the exchange is emotionally hurtful, regretful, or clearly dejected.
+- Use surprised when the user expresses shock, disbelief, or sudden surprise.
+- Use thinking when the exchange is analytical, reflective, or exploratory.
+- Use friendly when the exchange is warm, cooperative, appreciative, or reassuring.
+- Use neutral only when the exchange is emotionally flat.
 
 Conversation history:
 {history_text}
 
 Latest user message:
-{payload.user_text}
+{user_text_raw}
 
 Latest bot reply:
-{payload.bot_text}
+{bot_text_raw}
 
 Return ONLY the label.
 """.strip()
@@ -101,11 +132,13 @@ Return ONLY the label.
             max_output_tokens=8,
         )
 
-        emotion = (resp.output_text or "").strip().lower()
+        emotion = (resp.output_text or "").strip().lower().strip(" .,!?:;\"'")
+
         if emotion not in ALLOWED:
             emotion = "neutral"
 
         return EmotionResponse(emotion=emotion)
 
-    except Exception:
+    except Exception as e:
+        print("EMOTION ROUTE ERROR:", repr(e))
         return EmotionResponse(emotion="neutral")

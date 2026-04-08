@@ -10,6 +10,7 @@ from routes.negotiation_routes import router as negotiation_router
 from routes.message_routes import router as message_router
 from routes.realtime import router as realtime_router
 from database.db import init_db
+from routes.emotion_routes import router as emotion_router
 
 
 @asynccontextmanager
@@ -46,6 +47,7 @@ app.include_router(auth_router)
 app.include_router(negotiation_router)
 app.include_router(message_router)
 app.include_router(realtime_router)
+app.include_router(emotion_router)
 
 @app.get("/")
 def root():

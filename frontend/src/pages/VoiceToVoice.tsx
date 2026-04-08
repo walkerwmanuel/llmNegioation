@@ -13,7 +13,7 @@ import DownloadChatButton from "../components/ui/DownloadChatButton";
 import { NegotiationLayout } from "../components/layout/NegotiationLayout";
 import { useNegotiationSession } from "../hooks/useNegotiationSession";
 import { useAuth } from "../context/AuthContext";
-import AnimatedBotFace, { faceToneFromText, type FaceTone } from "../components/AnimatedBotFace";
+import AnimatedBotFace, { type FaceTone } from "../components/AnimatedBotFace";
 import { API } from "../config/api";
 
 type Agent = { name: string; persona: string; stance: string };
@@ -148,20 +148,23 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
   }, []);
 
 
-  async function animateBotReply(fullText: string) {
+  async function animateBotReply(fullText: string): Promise<void> {
     const words = fullText.split(/\s+/).filter(Boolean);
     let current = "";
   
     setDisplayedBotText("");
     setBotIsTalking(true);
   
-    for (let i = 0; i < words.length; i++) {
-      current = current ? `${current} ${words[i]}` : words[i];
-      setDisplayedBotText(current);
-      await new Promise((resolve) => setTimeout(resolve, 90));
-    }
+    try {
+      for (let i = 0; i < words.length; i++) {
+        current = current ? `${current} ${words[i]}` : words[i];
+        setDisplayedBotText(current);
   
-    setBotIsTalking(false);
+        await new Promise((resolve) => setTimeout(resolve, 90));
+      }
+    } finally {
+      setBotIsTalking(false);
+    }
   }
 
   // Keep latest form for callbacks without dependency churn
@@ -191,6 +194,49 @@ function DiffText({ oldText, newText }: { oldText: string; newText: string }) {
 const TRANSCRIBE_URL = API.speechToText.transcribe;
 const RESPOND_URL = API.speechToText.respond;
 const SETTINGS_URL = API.speechToText.updateSettings;
+const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/detect");
+
+const ALLOWED_FACE_TONES: FaceTone[] = [
+  "neutral",
+  "friendly",
+  "firm",
+  "thinking",
+  "concerned",
+  "angry",
+  "sad",
+  "surprised",
+];
+
+async function detectEmotionTone(
+  userText: string,
+  botText: string,
+  history: { speaker: string; content: string }[]
+): Promise<FaceTone> {
+  if (!botText.trim()) return "neutral";
+
+  try {
+    const res = await fetch(EMOTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_text: userText,
+        bot_text: botText,
+        history,
+      }),
+    });
+
+    if (!res.ok) return "neutral";
+
+    const data = await res.json();
+    const emotion = String(data?.emotion ?? "neutral").toLowerCase();
+
+    return ALLOWED_FACE_TONES.includes(emotion as FaceTone)
+      ? (emotion as FaceTone)
+      : "neutral";
+  } catch {
+    return "neutral";
+  }
+}
 
   const speakText = (text: string) => {
     try {
@@ -264,7 +310,7 @@ const SETTINGS_URL = API.speechToText.updateSettings;
         content: m.content,
         side: m.role === "user" ? ("left" as const) : ("right" as const),
         animateWords: false,
-        tone: m.role === "user" ? undefined : faceToneFromText(m.content),
+        tone: m.role === "user" ? undefined : "neutral",
       }));
   
       setMessages(loadedMessages);
@@ -274,8 +320,24 @@ const SETTINGS_URL = API.speechToText.updateSettings;
   
       setDisplayedBotText("");
       setBotIsTalking(false);
-      setBotFaceTone(lastBotMessage?.tone ?? "neutral");
       setLastUserText(lastUserMessage?.content ?? "");
+  
+      if (lastBotMessage?.content) {
+        const historyForEmotion = loadedMessages.map((m) => ({
+          speaker: m.speaker,
+          content: m.content,
+        }));
+  
+        const loadedTone = await detectEmotionTone(
+          lastUserMessage?.content ?? "",
+          lastBotMessage.content,
+          historyForEmotion
+        );
+  
+        setBotFaceTone(loadedTone);
+      } else {
+        setBotFaceTone("neutral");
+      }
   
       setPendingLoadId(null);
     }
@@ -507,28 +569,34 @@ async function startRecording() {
       // Only re-call bot if user edited their own message
       if (item.speaker === "You") {
         const cleaned = draft.trim();
-  
+      
+        const emotionHistory = prefix
+          .slice(0, -1)
+          .map((msg) => ({
+            speaker: msg.speaker,
+            content: msg.content,
+          }));
+      
         const res = await fetch(RESPOND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: cleaned }),
         });
-  
+      
         if (!res.ok) {
           const errorText = await res.text();
           throw new Error(`HTTP ${res.status}: ${errorText}`);
         }
-  
+      
         const data = await res.json();
         if (data?.error) throw new Error(data.error);
         if (!data?.bot) throw new Error("Unexpected response from server");
-  
+      
         const botText = String(data.bot);
-        const botTone = faceToneFromText(botText, cleaned);
-  
+      
         setLastUserText(cleaned);
-        setBotFaceTone(botTone);
-  
+        setBotFaceTone("neutral");
+      
         setMessages((prev) => [
           ...prev,
           {
@@ -536,11 +604,27 @@ async function startRecording() {
             content: botText,
             side: "right",
             animateWords: true,
-            tone: botTone,
+            tone: "neutral",
           },
         ]);
-  
-        await animateBotReply(botText);
+      
+        const finalTone = await detectEmotionTone(cleaned, botText, emotionHistory);
+          setBotFaceTone(finalTone);
+
+          await animateBotReply(botText);
+      
+        setMessages((prev) => {
+          const next = [...prev];
+          const lastIndex = next.length - 1;
+          if (lastIndex >= 0 && next[lastIndex].side === "right") {
+            next[lastIndex] = {
+              ...next[lastIndex],
+              tone: finalTone,
+            };
+          }
+          return next;
+        });
+      
         speakText(botText);
       }
     } catch (e: any) {
@@ -590,9 +674,8 @@ async function startRecording() {
       const botText = String(data.bot_text);
   
       // 🔥 AVATAR LOGIC
-      const botTone = faceToneFromText(botText, cleaned); // or (botText) if your fn only takes one arg
       setLastUserText(cleaned);
-      setBotFaceTone(botTone);
+      setBotFaceTone("neutral");
   
       // Update prompt inspector (unchanged)
       if (data.actual_system_prompt) {
@@ -613,20 +696,36 @@ async function startRecording() {
       }
   
       // Add to chat history (WITH avatar props)
-      setMessages((prev) => [
-        ...prev,
-        { speaker: "You", content: userText, side: "left" },
-        {
-          speaker: f.agent2.name,
-          content: botText,
-          side: "right",
-          animateWords: true,
-          tone: botTone,
-        },
-      ]);
-  
-      // 🔥 WORD-BY-WORD ANIMATION
-      await animateBotReply(botText);
+      const emotionHistory = [...history, { speaker: "You", content: userText }];
+
+setMessages((prev) => [
+  ...prev,
+  { speaker: "You", content: userText, side: "left" },
+  {
+    speaker: f.agent2.name,
+    content: botText,
+    side: "right",
+    animateWords: true,
+    tone: "neutral",
+  },
+]);
+
+const finalTone = await detectEmotionTone(cleaned, botText, emotionHistory);
+setBotFaceTone(finalTone);
+
+await animateBotReply(botText);
+
+setMessages((prev) => {
+  const next = [...prev];
+  const lastIndex = next.length - 1;
+  if (lastIndex >= 0 && next[lastIndex].side === "right") {
+    next[lastIndex] = {
+      ...next[lastIndex],
+      tone: finalTone,
+    };
+  }
+  return next;
+});
   
       // 🔊 TTS (unchanged, but now synced with avatar)
       if (data.bot_audio_base64 && ttsEnabled) {
@@ -1042,14 +1141,11 @@ async function startRecording() {
   </div>
 
   <div style={{ position: "sticky", top: 0 }}>
-    <AnimatedBotFace
-      name={form.agent2.name}
-      tone={botFaceTone}
-      isTalking={botIsTalking || speaking}
-      botText={messages.filter((m) => m.side === "right").at(-1)?.content || ""}
-      liveText={displayedBotText}
-      userText={lastUserText}
-    />
+  <AnimatedBotFace
+  name={form.agent2.name}
+  tone={botFaceTone}
+  isTalking={botIsTalking || speaking}
+/>
   </div>
 </CardContent>
         </Card>

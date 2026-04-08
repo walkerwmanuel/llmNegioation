@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { colors } from "./ui/colors";
 
 export type FaceTone =
@@ -59,18 +59,10 @@ export default function AnimatedBotFace({
 }) {
   const [mouthFrame, setMouthFrame] = useState(0);
   const [restingTone, setRestingTone] = useState<FaceTone>(tone);
-  const prevTalkingRef = useRef(isTalking);
 
   useEffect(() => {
-    if (isTalking) {
-      setRestingTone(tone);
-    } else if (prevTalkingRef.current && !isTalking) {
-      // just finished talking: lock in the last spoken tone as the resting face
-      setRestingTone(tone);
-    }
-
-    prevTalkingRef.current = isTalking;
-  }, [isTalking, tone]);
+    setRestingTone(tone);
+  }, [tone]);
 
   useEffect(() => {
     if (!isTalking) {
@@ -132,23 +124,55 @@ export default function AnimatedBotFace({
           lash: true,
         };
 
-      case "firm":
-        return {
-          browLeft: "M84 96 Q100 86 116 87",
-          browRight: "M140 87 Q156 86 172 96",
-          eyeScaleY: 0.82,
-          eyeOffsetY: 1,
-          pupilOffsetX: 0,
-          pupilOffsetY: 0.5,
-          smile: false,
-          frown: false,
-          mouthLine: true,
-          roundMouth: false,
-          blush: false,
-          lash: false,
-        };
+        case "firm":
+          return {
+            browLeft: "M84 92 Q100 89 116 90",
+            browRight: "M140 90 Q156 89 172 92",
+            eyeScaleY: 0.74,
+            eyeOffsetY: 1.2,
+            pupilOffsetX: 0,
+            pupilOffsetY: 0.3,
+            smile: false,
+            frown: false,
+            mouthLine: true,
+            roundMouth: false,
+            blush: false,
+            lash: false,
+          };
+  
+        case "concerned":
+          return {
+            browLeft: "M84 95 Q100 86 116 95",
+            browRight: "M140 95 Q156 86 172 95",
+            eyeScaleY: 0.8,
+            eyeOffsetY: 1.8,
+            pupilOffsetX: 0,
+            pupilOffsetY: 1.2,
+            smile: false,
+            frown: true,
+            mouthLine: false,
+            roundMouth: false,
+            blush: false,
+            lash: false,
+          };
+  
+          case "angry":
+  return {
+    browLeft: "M92 88 L112 96",
+    browRight: "M144 96 L164 88",
+    eyeScaleY: 0.45,
+    eyeOffsetY: 2.5,
+    pupilOffsetX: 0,
+    pupilOffsetY: 1,
+    smile: false,
+    frown: false,
+    mouthLine: false,
+    roundMouth: false,
+    blush: false,
+    lash: false,
+  };
 
-      case "thinking":
+        case "thinking":
         return {
           browLeft: "M84 94 Q100 89 116 97",
           browRight: "M140 89 Q156 80 172 88",
@@ -156,38 +180,6 @@ export default function AnimatedBotFace({
           eyeOffsetY: 0,
           pupilOffsetX: -2,
           pupilOffsetY: -1.5,
-          smile: false,
-          frown: false,
-          mouthLine: false,
-          roundMouth: false,
-          blush: false,
-          lash: false,
-        };
-
-      case "concerned":
-        return {
-          browLeft: "M84 89 Q100 101 116 93",
-          browRight: "M140 93 Q156 101 172 89",
-          eyeScaleY: 0.76,
-          eyeOffsetY: 1.5,
-          pupilOffsetX: 0,
-          pupilOffsetY: 1.5,
-          smile: false,
-          frown: true,
-          mouthLine: false,
-          roundMouth: false,
-          blush: false,
-          lash: false,
-        };
-
-      case "angry":
-        return {
-          browLeft: "M84 98 Q100 84 116 82",
-          browRight: "M140 82 Q156 84 172 98",
-          eyeScaleY: 0.62,
-          eyeOffsetY: 2,
-          pupilOffsetX: 0,
-          pupilOffsetY: 1.5,
           smile: false,
           frown: false,
           mouthLine: false,
@@ -293,16 +285,16 @@ export default function AnimatedBotFace({
             />
           );
 
-        case "angry":
-          return (
-            <path
-              d="M109 169 Q128 161 147 169"
-              stroke={appearance.lips}
-              strokeWidth="5.5"
-              fill="none"
-              strokeLinecap="round"
-            />
-          );
+          case "angry":
+            return (
+    <path
+      d="M112 168 Q128 162 144 168"
+      stroke={appearance.lips}
+      strokeWidth="6"
+      fill="none"
+      strokeLinecap="round"
+    />
+  );
 
         case "sad":
           return (
@@ -507,20 +499,24 @@ export default function AnimatedBotFace({
           <circle cx={leftPupilX + 2} cy={pupilY - 4} r="2.5" fill="#fff" />
           <circle cx={rightPupilX + 2} cy={pupilY - 4} r="2.5" fill="#fff" />
 
-          <path
-            d={`M92 ${104 + expression.eyeOffsetY} Q102 ${96 + expression.eyeOffsetY} 112 ${104 + expression.eyeOffsetY}`}
-            stroke="#2C1E16"
-            strokeWidth="2.2"
-            fill="none"
-            strokeLinecap="round"
-          />
-          <path
-            d={`M144 ${104 + expression.eyeOffsetY} Q154 ${96 + expression.eyeOffsetY} 164 ${104 + expression.eyeOffsetY}`}
-            stroke="#2C1E16"
-            strokeWidth="2.2"
-            fill="none"
-            strokeLinecap="round"
-          />
+          {displayedTone !== "angry" && (
+            <>
+              <path
+                d={`M92 ${104 + expression.eyeOffsetY} Q102 ${96 + expression.eyeOffsetY} 112 ${104 + expression.eyeOffsetY}`}
+                stroke="#2C1E16"
+                strokeWidth="2.2"
+                fill="none"
+                strokeLinecap="round"
+              />
+              <path
+                d={`M144 ${104 + expression.eyeOffsetY} Q154 ${96 + expression.eyeOffsetY} 164 ${104 + expression.eyeOffsetY}`}
+                stroke="#2C1E16"
+                strokeWidth="2.2"
+                fill="none"
+                strokeLinecap="round"
+              />
+            </>
+          )}
 
           {appearance.lash && expression.lash && (
             <>
