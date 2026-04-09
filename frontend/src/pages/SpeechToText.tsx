@@ -1067,23 +1067,18 @@ const EMOTION_URL = RESPOND_URL.replace(/\/speech-to-text\/respond$/, "/emotion/
                 color: colors.text,
               }}
             >
-              {/* OpenAI */}
-              <option value="gpt-4o-mini">gpt-4o-mini</option>
-              <option value="gpt-4o">gpt-4o</option>
-              <option value="gpt-5-mini">gpt-5-mini</option>
-              <option value="gpt-5.2">gpt-5.2</option>
-
-              {/* DeepSeek */}
-              <option value="deepseek-chat">deepseek-chat</option>
-
-              {/* Grok (use the exact IDs your backend supports) */}
-              <option value="grok-4-1-fast-non-reasoning">grok-4-1-fast-non-reasoning</option>
-              <option value="grok-4-1-fast-reasoning">grok-4-1-fast-reasoning</option>
-
-              {/* Gemini */}
-              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
-              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-              <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4o-mini">GPT-4o mini</option>
+              <option value="gpt-5.2">GPT-5.4</option>
+              <option value="gpt-5-mini">GPT-5.4 mini</option>
+              <option value="gpt-5-nano">GPT-5.4 nano</option>
+              <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+              <option value="gemini-3.1-flash-preview">Gemini 3.1 Flash</option>
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+              <option value="grok-4-1-fast-reasoning">Grok 4.1 Fast (Reasoning)</option>
+              <option value="grok-4-1-fast-non-reasoning">Grok 4.1 Fast (Non-Reasoning)</option>
+              <option value="deepseek-reasoner">DeepSeek-V3.2 (Thinking Mode)</option>
+              <option value="deepseek-chat">DeepSeek-V3.2 (Non-thinking Mode)</option>
             </select>
           </div>
 
