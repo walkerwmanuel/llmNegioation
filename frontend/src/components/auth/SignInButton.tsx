@@ -27,7 +27,7 @@ export function SignInButton() {
       shape="rectangular"
       size="large"
       theme="filled_black"
-      text="signin_with_google"
+      text="signin_with"
       width="260"
     />
   );
