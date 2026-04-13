@@ -69,10 +69,6 @@ export default function App() {
             <AuthButton />
           </div>
         </div>
-
-        <p style={{ margin: 0, fontSize: "1rem", opacity: 0.9 }}>
-          Watch AI agents practice and analyze negotiations in real time.
-        </p>
       </header>
 
       {/* ROUTES */}

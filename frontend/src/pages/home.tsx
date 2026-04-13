@@ -4,27 +4,16 @@ import "./home.css";
 export default function Home() {
   return (
     <>
-      {/* NAV */}
-      <div className="nav">
-        <div className="container nav-inner">
-          <div className="brand">
-            <span className="badge">NC STATE</span>
-            <span>University — Senior Design</span>
-          </div>
-          <div className="links">
-            <a href="#features">How It Works</a>
-          </div>
-        </div>
-      </div>
-
       {/* CTA SECTION — v1 */}
-      <section className="container section">
+      <section className="container section" style={{ display: "flex", justifyContent: "center", padding: "2.75rem 0 0.75rem"}}>
         <div
           className="cta-card"
           style={{
             textAlign: "center",
-            margin: "2rem 0",
-            padding: "1.5rem",
+            margin: "0 auto",
+            maxWidth: "700px",
+            width: "100%",
+            padding: "1.25rem 1rem",
             borderRadius: "1rem",
             background: "rgba(255,255,255,0.06)",
             border: "1px solid rgba(255,255,255,0.12)",
@@ -32,167 +21,108 @@ export default function Home() {
             color: "#fff",
           }}
         >
-          <h2 style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}>
-            🔥 Check Out the Text-to-Text Bot v1 🔥
+          <h2 style={{ fontSize: "1.5rem", marginBottom: "0.35rem" }}>
+            Bot-Bot Negotiation
           </h2>
-          <p className="muted" style={{ marginBottom: "1rem", opacity: 0.9 }}>
-            Watch two AI agents negotiate a topic in real-time!
+          <p className="muted" style={{ marginBottom: "0.85rem", opacity: 0.9 }}>
+            Two agents with distinct cultural profiles negotiate simulated scenarios
           </p>
           <Link
             to="/text-to-text"
             className="btn primary"
             style={{
               fontSize: "1.2rem",
-              padding: "0.75rem 1.5rem",
+              padding: "0.5rem 0.5rem",
+              minWidth: "180px",
               display: "inline-block",
               textDecoration: "none",
+              textAlign: "center",
             }}
           >
-            Try It Now
+            Text-to-Text
           </Link>
         </div>
       </section>
 
-    {/* CTA SECTION — v2 (closer to v1) */}
-    <section
-      className="container section"
-      style={{
-        marginTop: "-1rem",   // pulls v2 upward closer to v1
-        marginBottom: "0.5rem",
-      }}
-    >
-      <div
-        className="cta-card"
-        style={{
-          textAlign: "center",
-          margin: "1rem 0",
-          padding: "1.25rem",
-          borderRadius: "1rem",
-          background: "rgba(255,255,255,0.06)",
-          border: "1px solid rgba(255,255,255,0.12)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-          color: "#fff",
-        }}
-      >
-        <h2 style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>
-          🎙️ Try Negotiation Bot v2 — Live Speech Negotiation 🎙️
-        </h2>
-        <p className="muted" style={{ marginBottom: "0.75rem", opacity: 0.9 }}>
-          Practice real spoken negotiations — structured like an actual negotiation.
-        </p>
-        <Link
-          to="/speech-to-text"
-          className="btn primary"
+      {/* CTA SECTION — v2 */}
+      <section className="container section" style={{ display: "flex", justifyContent: "center", padding: "0.75rem 0" }}>
+        <div
+          className="cta-card"
           style={{
-            fontSize: "1.1rem",
-            padding: "0.5rem 1.25rem",
-            display: "inline-block",
-            textDecoration: "none",
+            textAlign: "center",
+            margin: "0 auto",
+            maxWidth: "700px",
+            width: "100%",
+            padding: "1.25rem 1rem",
+            borderRadius: "1rem",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            color: "#fff",
           }}
         >
-          Practice Live Negotiations
-        </Link>
-      </div>
-    </section>
+          <h2 style={{ fontSize: "1.5rem", marginBottom: "0.35rem" }}>
+            Human-Bot Negotiation
+          </h2>
+          <p className="muted" style={{ marginBottom: "0.85rem", opacity: 0.9 }}>
+            Adapt one agent to allow human participation via text with voice input
+          </p>
+          <Link
+            to="/speech-to-text"
+            className="btn primary"
+            style={{
+              fontSize: "1.2rem",
+              padding: "0.5rem 0.5rem",
+              minWidth: "180px",
+              display: "inline-block",
+              textDecoration: "none",
+              textAlign: "center",
+            }}
+          >
+            Voice-to-Text
+          </Link>
+        </div>
+      </section>
 
-    {/* CTA SECTION — v3 (Voice vs. Voice) */}
-    <section
-      className="container section"
-      style={{
-      marginTop: "-1rem",
-      marginBottom: "0.5rem",
-      }}
-    >
-    <div
-      className="cta-card"
-      style={{
-        textAlign: "center",
-        margin: "1rem 0",
-        padding: "1.25rem",
-        borderRadius: "1rem",
-        background: "rgba(255,255,255,0.06)",
-        border: "1px solid rgba(255,255,255,0.12)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-        color: "#fff",
-      }}
-  >
-    <h2 style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>
-      🔊 Try Negotiation Bot v3 — Real-Time Voice vs. Voice 🔊
-    </h2>
-    <p className="muted" style={{ marginBottom: "0.75rem", opacity: 0.9 }}>
-      Two-way live voice conversation with advanced negotiation flow visualization.
-    </p>
-    <Link
-      to="/voice-to-voice"
-      className="btn primary"
-      style={{
-        fontSize: "1.1rem",
-        padding: "0.5rem 1.25rem",
-        display: "inline-block",
-        textDecoration: "none",
-      }}
-    >
-      Launch Voice-to-Voice
-    </Link>
-  </div>
-</section>
-
-
-
-      {/* HOW IT WORKS */}
-      <section id="features" className="container section">
-        <h2 className="title">How It Works</h2>
-        <p className="muted">Step-by-step view aligned with milestones.</p>
-
-        <div className="steps">
-          <div className="step-box">
-            <div className="badge-num">1</div>
-            <Link to="/text-to-text" className="step-title">
-              Bot-Bot Negotiation (Text vs. Text)
-            </Link>
-            <p className="muted">
-              Two LLM agents with distinct cultural profiles negotiate simulated
-              scenarios (e.g., salary/benefits, school cellphone policy). The GUI
-              visualizes rounds, outcomes, winners, offer types, and deadlocks.
-            </p>
-          </div>
-
-          <div className="step-box">
-            <div className="badge-num">2</div>
-            <Link to="/speech-to-text" className="step-title">
-              Human–Bot (Voice vs. Text)
-            </Link>
-            <p className="muted">
-              Adapt one agent to allow human participation via text with optional
-              voice input (speech-to-text). Compare outcomes vs. bot–bot and
-              iterate for research goals.
-            </p>
-          </div>
-
-          <div className="step-box">
-            <div className="badge-num">3</div>
-            <Link to="/voice-to-voice" className="step-title">
-              Real-Time Multimodal (Voice vs. Voice)
-            </Link>
-            <p className="muted">
-              Enable two-way synchronous voice conversation. Provide advanced
-              visualization of negotiation/deliberation flow and ensure scalability
-              for classroom and external deployments.
-            </p>
-          </div>
-
-          <div className="step-box">
-            <div className="badge-num">4</div>
-            <div className="step-title">Logging, Stats &amp; Archival</div>
-            <p className="muted">
-              Archive runtime results and output statistics: number of rounds, success
-              rate, deadlocks, offer types, and winners—enabling benchmarking and
-              reproducible studies.
-            </p>
-          </div>
+      {/* CTA SECTION — v3 */}
+      <section className="container section" style={{ display: "flex", justifyContent: "center", padding: "0.75rem 0" }}>
+        <div
+          className="cta-card"
+          style={{
+            textAlign: "center",
+            margin: "0 auto",
+            maxWidth: "700px",
+            width: "100%",
+            padding: "1.25rem 1rem",
+            borderRadius: "1rem",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            color: "#fff",
+          }}
+        >
+          <h2 style={{ fontSize: "1.5rem", marginBottom: "0.35rem" }}>
+            Real-Time Multimodal
+          </h2>
+          <p className="muted" style={{ marginBottom: "0.85rem", opacity: 0.9 }}>
+            Two-way voice conversation with advanced negotiation flow visualization
+          </p>
+          <Link
+            to="/voice-to-voice"
+            className="btn primary"
+            style={{
+              fontSize: "1.2rem",
+              padding: "0.5rem 0.5rem",
+              minWidth: "180px",
+              display: "inline-block",
+              textDecoration: "none",
+              textAlign: "center",
+            }}
+          >
+            Voice-to-Voice
+          </Link>
         </div>
       </section>
     </>
-    
   );
 }

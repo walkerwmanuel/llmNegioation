@@ -29,23 +29,6 @@ export default function LoginPage() {
             textAlign: "center",
           }}
         >
-          {/* Badge */}
-          <div style={{ marginBottom: "24px" }}>
-            <span
-              style={{
-                display: "inline-block",
-                background: "#CC0000",
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: "0.75rem",
-                letterSpacing: "0.08em",
-                padding: "4px 12px",
-                borderRadius: "6px",
-              }}
-            >
-              NC STATE
-            </span>
-          </div>
 
           {/* Title */}
           <h1
@@ -57,9 +40,7 @@ export default function LoginPage() {
               lineHeight: 1.2,
             }}
           >
-            Cross-Cultural
-            <br />
-            Negotiation System
+            Access your account.
           </h1>
 
           {/* Subtitle */}
