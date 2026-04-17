@@ -186,7 +186,6 @@ export default function TextToText() {
     currentNegotiationId,
     isLoading: isLoadingNegotiation,
     loadError: negotiationLoadError,
-    startNewNegotiation,
     loadNegotiation,
     saveMessage,
     updateSettings,
@@ -286,12 +285,6 @@ export default function TextToText() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    // Start a new negotiation in the backend if authenticated
-    let negId: number | null = null;
-    if (isAuthenticated) {
-      negId = await startNewNegotiation(form.topic, 'ai_vs_ai', getSettingsFromForm());
-    }
-
     // Build the system prompt for display
     const currentSystemPrompt = `NEGOTIATION TOPIC: ${form.topic}
 
@@ -316,16 +309,11 @@ export default function TextToText() {
       await postStream(
         API_URL,
         buildPayload({ transcript: "", form }),
-        async (msg) => {
+        (msg) => {
           if (msg.type === "round") setMessages((p) => [...p, { kind: "round", round: msg.round }]);
           if (msg.type === "turn") {
             const side: "left" | "right" = isAgent1(msg.speaker) ? "left" : "right";
             setMessages((p) => [...p, { kind: "turn", speaker: msg.speaker, content: msg.content, side }]);
-            // Save message to backend using captured negotiation ID
-            if (negId) {
-              const role = side === "left" ? "ai_1" : "ai_2";
-              await saveMessage(role, msg.content, negId);
-            }
           }
         },
         controller.signal
