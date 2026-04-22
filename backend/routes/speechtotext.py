@@ -11,6 +11,8 @@ import json
 from shared import settings as shared_settings
 from shared.settings import BotConfig, SpeechSettings, current_settings
 from services.openai import get_openai_response
+from services.openai import get_openai_response_with_history
+
 
 
 # ====== FETCH KEY ======
@@ -143,9 +145,9 @@ async def respond_to_text(body: TextPrompt):
 
         prompt = system_prompt + "\n\nUser: " + user_text
 
-        bot_response = get_openai_response(
+        bot_response = get_openai_response_with_history(
             shared_settings.current_settings.model,
-            prompt
+            messages  # pass the full messages list you already built above
         )
 
 
