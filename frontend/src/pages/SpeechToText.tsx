@@ -538,10 +538,15 @@ const [botFaceTone, setBotFaceTone] = useState<FaceTone>("neutral");
       setSystemPrompt(currentSystemPrompt);
       setLastPromptSent(`User message: ${cleaned}`);
   
+      const history = messages.map(msg => ({
+        speaker: msg.speaker,
+        content: msg.content
+      }));
+
       const res = await fetch(RESPOND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: cleaned }),
+        body: JSON.stringify({ text: cleaned, history: history }),
       });
   
       if (!res.ok) {
