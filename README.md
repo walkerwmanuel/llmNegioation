@@ -163,3 +163,7 @@ Required GitHub Secrets for deployment:
 - `VITE_API_URL`
 - `VITE_GOOGLE_CLIENT_ID`
 - `PROD_API_URL`
+
+
+DevOps Guide:
+https://docs.google.com/document/d/1TKty5AzwoHS1eo-0r1VWYZM5wHJkS6Csg-Bl6i-xc_g/edit?tab=t.0#heading=h.vdlprmqz437h
